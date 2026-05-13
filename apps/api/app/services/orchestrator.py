@@ -23,12 +23,7 @@ logger = logging.getLogger(__name__)
 def twiml_message(text: str) -> str:
     trimmed = (text or "")[:1500]
     safe = html.escape(trimmed, quote=True)
-    return (
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        "<Response>"
-        f"<Message>{safe}</Message>"
-        "</Response>"
-    )
+    return f'<?xml version="1.0" encoding="UTF-8"?><Response><Message>{safe}</Message></Response>'
 
 
 def twiml_empty() -> str:

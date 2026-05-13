@@ -5,11 +5,11 @@ import time
 import uuid
 from typing import Any
 
+from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.effective_settings import EffectiveSettings, build_effective_settings
 from app.models import (
     Conversation,
     ConversationStatus,
@@ -19,6 +19,8 @@ from app.models import (
     MessageDirection,
     ToolInvocation,
 )
+from app.services.conversation import list_recent_messages
+from app.services.effective_settings import EffectiveSettings, build_effective_settings
 
 
 def normalize_phone(value: str) -> str:
@@ -53,29 +55,39 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "description": (
                 "Obligatorio para persistir el contacto de ESTE chat en el CRM del panel. "
                 "Crea o actualiza el lead de la conversación actual. "
-                "Llámala en cuanto tengas datos nuevos (nombre, email, ciudad en Perú/LATAM, empresa, "
-                "producto/servicio, presupuesto, notas). Puedes llamarla varias veces: cada llamada "
-                "fusiona campos y qualification con lo ya guardado. "
+                "Llámala en cuanto tengas datos nuevos (nombre, email, ciudad en Perú/LATAM, "
+                "empresa, producto/servicio, presupuesto, notas). Puedes llamarla varias "
+                "veces: cada llamada fusiona campos y qualification con lo ya guardado. "
                 "Si solo charlan sin datos, no hace falta. No inventes datos."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "name": {"type": "string", "description": "Nombre del contacto si lo dio."},
-                    "email": {"type": "string", "description": "Correo para cotización o comprobante."},
+                    "email": {
+                        "type": "string",
+                        "description": "Correo para cotización o comprobante.",
+                    },
                     "phone": {
                         "type": "string",
-                        "description": "Número E.164 o con prefijo whatsapp:; omite para usar el del chat.",
+                        "description": (
+                            "Número E.164 o con prefijo whatsapp:; omite para usar el del chat."
+                        ),
                     },
                     "notes": {
                         "type": "string",
-                        "description": "Resumen libre: urgencia, distrito, RUC, forma de pago, etc.",
+                        "description": (
+                            "Resumen libre: urgencia, distrito, RUC, forma de pago, etc."
+                        ),
                     },
                     "score": {
                         "type": "integer",
                         "description": "Lead quality score from 0 (low) to 100 (high).",
                     },
-                    "company": {"type": "string", "description": "Empresa o razón social si aplica."},
+                    "company": {
+                        "type": "string",
+                        "description": "Empresa o razón social si aplica.",
+                    },
                     "city": {
                         "type": "string",
                         "description": "Ciudad o distrito (ej. Lima, Miraflores, Arequipa).",
@@ -112,8 +124,8 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "function": {
             "name": "request_human_handoff",
             "description": (
-                "Pasa la conversación a un humano del negocio. Úsalo si piden persona, reclamo fuerte "
-                "o tema fuera de alcance."
+                "Pasa la conversación a un humano del negocio. Úsalo si piden persona, "
+                "reclamo fuerte o tema fuera de alcance."
             ),
             "parameters": {
                 "type": "object",
@@ -286,26 +298,29 @@ async def execute_tool(
 
 
 SYSTEM_PROMPT_BASE = """Eres el asistente de WhatsApp de un negocio en América Latina.
-Prioriza reglas y vocabulario del panel del negocio; si el negocio es de Perú, usa contexto local
-(ciudades y distritos, soles PEN, boleta/factura y RUC cuando el negocio lo pida en sus instrucciones).
-Responde en español salvo que el usuario escriba en otro idioma. Sé breve y claro (estilo WhatsApp).
+Prioriza reglas y vocabulario del panel del negocio; si el negocio es de Perú, usa contexto
+local (ciudades y distritos, soles PEN, boleta/factura y RUC cuando el negocio lo pida en
+sus instrucciones). Responde en español salvo que el usuario escriba en otro idioma. Sé
+breve y claro (estilo WhatsApp).
 
 Exactitud comercial:
-- Si en la configuración existe un bloque de catálogo o lista de precios, trátalo como fuente de verdad:
-  no inventes SKU, precios ni stock. Si el producto no está listado, dilo y ofrece alternativa del catálogo
-  o pasar a un humano.
-- Respeta las reglas de precios, envíos, pagos y devoluciones del panel; si algo no está escrito, no lo asumas.
+- Si en la configuración existe un bloque de catálogo o lista de precios, trátalo como
+  fuente de verdad: no inventes SKU, precios ni stock. Si el producto no está listado,
+  dilo y ofrece alternativa del catálogo o pasar a un humano.
+- Respeta las reglas de precios, envíos, pagos y devoluciones del panel; si algo no está
+  escrito, no lo asumas.
 
 CRM (muy importante):
-- Cuando el usuario comparta datos útiles para venta o seguimiento (nombre, correo, ciudad o distrito,
-  empresa, qué le interesa comprar, presupuesto aproximado, plazos, etc.), llama a la herramienta
-  save_lead en ese mismo turno o en cuanto tengas esos datos; si más adelante corrigen o agregan
-  información, vuelve a llamar save_lead para actualizar.
-- Al iniciar una consulta de compra o cotización, puedes usar get_lead_by_phone con el número del chat
-  para recuperar datos ya guardados y no repetir preguntas.
-- No inventes datos en el CRM: solo guarda lo que el usuario (o el hilo) indique de forma razonable.
-- Si piden hablar con una persona, hay reclamo grave o no puedes resolver, usa request_human_handoff
-  y tranquiliza: alguien del equipo dará seguimiento."""
+- Cuando el usuario comparta datos útiles para venta o seguimiento (nombre, correo, ciudad
+  o distrito, empresa, qué le interesa comprar, presupuesto aproximado, plazos, etc.),
+  llama a la herramienta save_lead en ese mismo turno o en cuanto tengas esos datos; si
+  más adelante corrigen o agregan información, vuelve a llamar save_lead para actualizar.
+- Al iniciar una consulta de compra o cotización, puedes usar get_lead_by_phone con el
+  número del chat para recuperar datos ya guardados y no repetir preguntas.
+- No inventes datos en el CRM: solo guarda lo que el usuario (o el hilo) indique de forma
+  razonable.
+- Si piden hablar con una persona, hay reclamo grave o no puedes resolver, usa
+  request_human_handoff y tranquiliza: alguien del equipo dará seguimiento."""
 
 
 def _prompt_section(title: str, body: str) -> str:
@@ -325,7 +340,9 @@ def build_system_prompt(eff: EffectiveSettings) -> str:
             eff.agent_catalog,
         )
     )
-    parts.append(_prompt_section("Reglas de precios, impuestos y redondeos", eff.agent_pricing_rules))
+    parts.append(
+        _prompt_section("Reglas de precios, impuestos y redondeos", eff.agent_pricing_rules)
+    )
     parts.append(_prompt_section("Envíos, cobertura y tiempos", eff.agent_shipping_zones))
     parts.append(_prompt_section("Medios de pago y condiciones", eff.agent_payment_methods))
     parts.append(_prompt_section("Cambios, devoluciones y garantía", eff.agent_returns_warranty))
@@ -342,13 +359,15 @@ def build_system_prompt(eff: EffectiveSettings) -> str:
             _prompt_section(
                 "Datos a capturar en el lead",
                 eff.agent_lead_capture
-                + "\n\nUsa save_lead (campos estructurados y/o notes) cuando tengas esa información.",
+                + "\n\nUsa save_lead (campos estructurados y/o notes) cuando tengas esa "
+                "información.",
             )
         )
     parts.append(
         "\n\n## Recordatorio final\n"
-        "Los datos guardados con save_lead son los que el dueño del negocio ve en el panel en «Leads». "
-        "Si hubo intercambio con datos de contacto o de pedido y aún no llamaste save_lead, hazlo antes de cerrar el tema."
+        "Los datos guardados con save_lead son los que el dueño del negocio ve en el panel "
+        "en «Leads». Si hubo intercambio con datos de contacto o de pedido y aún no llamaste "
+        "save_lead, hazlo antes de cerrar el tema."
     )
     return "".join(parts)
 
@@ -383,8 +402,9 @@ async def generate_assistant_reply(
         if eff.gemini_api_key:
             return (
                 f"Recibí tu mensaje. Resumen rápido: «{user_text[:500]}»\n\n"
-                "El proveedor de LLM está en **OpenAI**, pero solo tienes clave **Gemini** guardada. "
-                "En Configuración cambia el proveedor a **Gemini**, guarda, y vuelve a escribir."
+                "El proveedor de LLM está en **OpenAI**, pero solo tienes clave **Gemini** "
+                "guardada. En Configuración cambia el proveedor a **Gemini**, guarda, y "
+                "vuelve a escribir."
             )
         return (
             f"Recibí tu mensaje. Resumen rápido: «{user_text[:500]}»\n\n"

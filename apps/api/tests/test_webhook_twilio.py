@@ -31,7 +31,12 @@ async def test_twilio_webhook_forbidden_when_signature_invalid(
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         r = await client.post(
             "/webhooks/twilio/whatsapp",
-            data={"From": "whatsapp:+1", "To": "whatsapp:+2", "Body": "hola", "MessageSid": "SMxx1"},
+            data={
+                "From": "whatsapp:+1",
+                "To": "whatsapp:+2",
+                "Body": "hola",
+                "MessageSid": "SMxx1",
+            },
         )
     assert r.status_code == 403
 
@@ -42,10 +47,7 @@ async def test_twilio_webhook_success_mocked_pipeline(monkeypatch: pytest.Monkey
         return True
 
     async def fake_process(_session: Any, _form: dict[str, Any]) -> str:
-        return (
-            '<?xml version="1.0" encoding="UTF-8"?>'
-            "<Response><Message>ok</Message></Response>"
-        )
+        return '<?xml version="1.0" encoding="UTF-8"?><Response><Message>ok</Message></Response>'
 
     monkeypatch.setattr(
         "app.webhooks.twilio_whatsapp.validate_twilio_request_async",

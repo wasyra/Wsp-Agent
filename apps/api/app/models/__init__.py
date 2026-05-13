@@ -3,6 +3,7 @@ from __future__ import annotations
 import enum
 import uuid
 from datetime import datetime
+
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -10,18 +11,18 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 
-class ConversationStatus(str, enum.Enum):
+class ConversationStatus(enum.StrEnum):
     open = "open"
     handed_off = "handed_off"
     closed = "closed"
 
 
-class MessageDirection(str, enum.Enum):
+class MessageDirection(enum.StrEnum):
     inbound = "inbound"
     outbound = "outbound"
 
 
-class HandoffStatus(str, enum.Enum):
+class HandoffStatus(enum.StrEnum):
     pending = "pending"
     resolved = "resolved"
 
@@ -48,9 +49,9 @@ class Conversation(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    messages: Mapped[list["Message"]] = relationship(back_populates="conversation")
-    lead: Mapped["Lead | None"] = relationship(back_populates="conversation", uselist=False)
-    handoffs: Mapped[list["Handoff"]] = relationship(back_populates="conversation")
+    messages: Mapped[list[Message]] = relationship(back_populates="conversation")
+    lead: Mapped[Lead | None] = relationship(back_populates="conversation", uselist=False)
+    handoffs: Mapped[list[Handoff]] = relationship(back_populates="conversation")
 
 
 class Message(Base):
@@ -66,7 +67,7 @@ class Message(Base):
     twilio_message_sid: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    conversation: Mapped["Conversation"] = relationship(back_populates="messages")
+    conversation: Mapped[Conversation] = relationship(back_populates="messages")
 
 
 class Lead(Base):
@@ -85,7 +86,7 @@ class Lead(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    conversation: Mapped["Conversation"] = relationship(back_populates="lead")
+    conversation: Mapped[Conversation] = relationship(back_populates="lead")
 
 
 class ToolInvocation(Base):
@@ -117,7 +118,7 @@ class Handoff(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    conversation: Mapped["Conversation"] = relationship(back_populates="handoffs")
+    conversation: Mapped[Conversation] = relationship(back_populates="handoffs")
 
 
 class AppConfiguration(Base):

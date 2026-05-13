@@ -18,8 +18,8 @@ class Settings(BaseSettings):
     def database_url_non_empty(cls, v: object) -> object:
         if v is None or (isinstance(v, str) and not v.strip()):
             raise ValueError(
-                "DATABASE_URL debe estar definida (URI Session pooler de Supabase, postgresql+asyncpg://...). "
-                "Ver README."
+                "DATABASE_URL debe estar definida (URI Session pooler de Supabase, "
+                "postgresql+asyncpg://...). Ver README."
             )
         return v
 

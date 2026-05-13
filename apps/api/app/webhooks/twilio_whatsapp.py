@@ -23,7 +23,9 @@ async def twilio_whatsapp(
 
     if not await validate_twilio_request_async(request, form_dict, db):
         twilio_webhook_total.labels("forbidden").inc()
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid Twilio signature")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Invalid Twilio signature"
+        )
 
     try:
         xml = await process_inbound_whatsapp(db, form_dict)

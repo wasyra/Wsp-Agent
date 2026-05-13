@@ -102,9 +102,15 @@ async def build_effective_settings(session: AsyncSession) -> EffectiveSettings:
         agent_instructions=_text(row.agent_instructions if row else None, env.agent_instructions),
         agent_lead_capture=_text(row.agent_lead_capture if row else None, env.agent_lead_capture),
         agent_catalog=_text(row.agent_catalog if row else None, env.agent_catalog),
-        agent_pricing_rules=_text(row.agent_pricing_rules if row else None, env.agent_pricing_rules),
-        agent_shipping_zones=_text(row.agent_shipping_zones if row else None, env.agent_shipping_zones),
-        agent_payment_methods=_text(row.agent_payment_methods if row else None, env.agent_payment_methods),
+        agent_pricing_rules=_text(
+            row.agent_pricing_rules if row else None, env.agent_pricing_rules
+        ),
+        agent_shipping_zones=_text(
+            row.agent_shipping_zones if row else None, env.agent_shipping_zones
+        ),
+        agent_payment_methods=_text(
+            row.agent_payment_methods if row else None, env.agent_payment_methods
+        ),
         agent_returns_warranty=_text(
             row.agent_returns_warranty if row else None,
             env.agent_returns_warranty,

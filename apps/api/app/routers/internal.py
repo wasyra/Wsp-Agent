@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Annotated
 from uuid import UUID
 
@@ -22,7 +22,9 @@ from app.models import (
     Message,
 )
 
-router = APIRouter(prefix="/internal", tags=["internal"], dependencies=[Depends(verify_internal_api_key)])
+router = APIRouter(
+    prefix="/internal", tags=["internal"], dependencies=[Depends(verify_internal_api_key)]
+)
 
 
 class MessageOut(BaseModel):
@@ -133,7 +135,7 @@ class DeploymentStatus(BaseModel):
 
 
 def _utc_day_start(d: date) -> datetime:
-    return datetime.combine(d, time.min, tzinfo=timezone.utc)
+    return datetime.combine(d, time.min, tzinfo=UTC)
 
 
 def _utc_day_end_exclusive(d: date) -> datetime:
@@ -214,10 +216,14 @@ async def list_conversations(
     db: Annotated[AsyncSession, Depends(get_db)],
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    q: str | None = Query(default=None, description="Teléfono, canal o texto en lead (nombre/email/tel)"),
+    q: str | None = Query(
+        default=None, description="Teléfono, canal o texto en lead (nombre/email/tel)"
+    ),
     status: str | None = Query(default=None, description="open | handed_off | closed"),
     date_from: str | None = Query(default=None, description="updated_at >= (YYYY-MM-DD UTC)"),
-    date_to: str | None = Query(default=None, description="updated_at < día siguiente (YYYY-MM-DD UTC)"),
+    date_to: str | None = Query(
+        default=None, description="updated_at < día siguiente (YYYY-MM-DD UTC)"
+    ),
 ) -> list[ConversationSummary]:
     count_sq = (
         select(Message.conversation_id, func.count(Message.id).label("cnt"))
@@ -278,7 +284,9 @@ async def list_leads(
     date_from: str | None = Query(default=None),
     date_to: str | None = Query(default=None),
 ) -> list[LeadListItem]:
-    stmt = select(Lead, Conversation.twilio_from).join(Conversation, Lead.conversation_id == Conversation.id)
+    stmt = select(Lead, Conversation.twilio_from).join(
+        Conversation, Lead.conversation_id == Conversation.id
+    )
     conds: list = []
     if q and q.strip():
         term = f"%{q.strip()}%"
@@ -436,7 +444,7 @@ async def resolve_pending_handoff(
     conversation_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict[str, object]:
-    """Marca todos los handoffs pendientes como resueltos y reabre la conversación si estaba en handed_off."""
+    """Marca handoffs pendientes como resueltos y reabre la conversación si estaba en handed_off."""
     stmt = select(Handoff).where(
         Handoff.conversation_id == conversation_id,
         Handoff.status == HandoffStatus.pending,
@@ -444,8 +452,10 @@ async def resolve_pending_handoff(
     result = await db.execute(stmt)
     pending_list = list(result.scalars().all())
     if not pending_list:
-        raise HTTPException(status_code=404, detail="No hay escalado pendiente para esta conversación")
-    now = datetime.now(timezone.utc)
+        raise HTTPException(
+            status_code=404, detail="No hay escalado pendiente para esta conversación"
+        )
+    now = datetime.now(UTC)
     for h in pending_list:
         h.status = HandoffStatus.resolved
         h.resolved_at = now

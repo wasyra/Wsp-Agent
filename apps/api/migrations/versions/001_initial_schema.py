@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
@@ -11,9 +11,9 @@ import app.models  # noqa: F401
 from app.db.base import Base
 
 revision: str = "001_initial"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 _LEGACY_ALTER = (
     "ALTER TABLE app_configuration ADD COLUMN IF NOT EXISTS llm_provider VARCHAR(16)",
@@ -32,7 +32,10 @@ _LEGACY_ALTER = (
     "ALTER TABLE app_configuration ADD COLUMN IF NOT EXISTS agent_hard_rules TEXT",
     "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS internal_notes TEXT",
     "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS internal_tags JSONB",
-    "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_agent_llm_status VARCHAR(16) DEFAULT 'ok'",
+    (
+        "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS "
+        "last_agent_llm_status VARCHAR(16) DEFAULT 'ok'"
+    ),
     "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_agent_llm_error TEXT",
 )
 

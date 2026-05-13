@@ -14,7 +14,9 @@ from app.models import (
 )
 
 
-async def get_inbound_by_twilio_sid(session: AsyncSession, twilio_message_sid: str) -> Message | None:
+async def get_inbound_by_twilio_sid(
+    session: AsyncSession, twilio_message_sid: str
+) -> Message | None:
     stmt = select(Message).where(
         Message.twilio_message_sid == twilio_message_sid,
         Message.direction == MessageDirection.inbound,
@@ -66,9 +68,7 @@ async def add_message(
     session.add(msg)
     await session.flush()
     await session.execute(
-        update(Conversation)
-        .where(Conversation.id == conversation_id)
-        .values(updated_at=func.now())
+        update(Conversation).where(Conversation.id == conversation_id).values(updated_at=func.now())
     )
     return msg
 

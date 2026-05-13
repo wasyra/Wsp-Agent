@@ -11,10 +11,9 @@ _root = Path(__file__).resolve().parents[1]
 if str(_root) not in sys.path:
     sys.path.insert(0, str(_root))
 
+import app.models  # noqa: E402, F401
 from app.config import get_settings  # noqa: E402
 from app.db.base import Base  # noqa: E402
-
-import app.models  # noqa: E402, F401
 
 config = context.config
 if config.config_file_name is not None:

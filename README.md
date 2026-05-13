@@ -1,118 +1,308 @@
-# Wsp-AgentAI — WhatsApp agent (Twilio)
+# Wsp-Agent
 
-Monorepo: **FastAPI** (`apps/api`) + **Next.js** (`apps/web`) + **Supabase (Postgres)**. El webhook de Twilio recibe mensajes de WhatsApp, persiste conversación, opcionalmente llama a **OpenAI** con tools (`save_lead`, `get_lead_by_phone`, `request_human_handoff`) y responde con **TwiML**.
+Agente de WhatsApp con LLM + tool-calling, panel de operación y handoff a humano. Pensado como **proyecto de demostración** sobre Twilio + FastAPI + Next.js + Supabase: el usuario escribe por WhatsApp, el agente responde, extrae datos del cliente como **leads** y se ve todo en un panel web.
 
-Documento de diseño: [PLAN_WHATSAPP_AGENT.md](./PLAN_WHATSAPP_AGENT.md).
+[![CI](https://github.com/wasyra/Wsp-Agent/actions/workflows/ci.yml/badge.svg)](https://github.com/wasyra/Wsp-Agent/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.12+-3776AB?logo=python&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs)
+![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi)
+![Supabase](https://img.shields.io/badge/Supabase-Postgres-3ECF8E?logo=supabase)
 
-## Requisitos
+---
 
-- Docker Desktop **o** Node 20+, Python 3.12+, y un proyecto **[Supabase](https://supabase.com/dashboard)** (Postgres en la nube).
-- Cuenta Twilio con **WhatsApp Sandbox** (o número aprobado).
+## ¿Qué es esto?
 
-## Variables de entorno
+Un negocio en LATAM conecta su WhatsApp (Twilio) a este agente. Cuando un cliente escribe, el agente:
 
-- Raíz: [`.env.example`](./.env.example) (para `docker compose`).
-- API: [`apps/api/.env.example`](./apps/api/.env.example).
-- Web: copia a `apps/web/.env.local` desde [`apps/web/.env.example`](./apps/web/.env.example).
+1. Recibe el mensaje vía webhook Twilio, guarda la conversación y valida la firma HMAC.
+2. Lee el contexto del negocio (catálogo, precios, FAQ, reglas) configurado en el panel.
+3. Llama a un LLM (Gemini o OpenAI) con **3 tools** disponibles para acciones reales.
+4. Persiste el lead, actualiza el panel y responde por WhatsApp con TwiML.
+5. Si pide hablar con una persona, marca handoff y queda visible para el operador humano.
 
-`WEBHOOK_BASE_URL` debe coincidir **exactamente** con la URL pública que Twilio llama (incluido esquema y path), para validar la firma cuando `TWILIO_VALIDATE_SIGNATURE=true`. También puedes definirlo desde el panel: **http://localhost:3000/configuracion** (se guarda en Supabase y sustituye al `.env` de la API para esos campos).
+El frontend Next.js es un **panel de operación**: lista de chats, detalle de cada conversación, leads capturados, configuración (Twilio, LLM, catálogo) y estado del despliegue.
 
-### Supabase (`DATABASE_URL`)
+## ¿Qué demuestra?
 
-1. Crea un proyecto en el [dashboard de Supabase](https://supabase.com/dashboard).
-2. Pulsa **Connect** en el dashboard y elige **Session pooler** (IPv4 si tu red no soporta IPv6 hacia `db.<ref>.supabase.co`). Copia el **host** de la URI tal cual (puede ser `aws-0-...` o `aws-1-...` según el proyecto). Si inventas el host y ves `Tenant or user not found`, vuelve a copiarlo desde **Connect**.
-3. Sustituye el prefijo del esquema por el driver async de Python: `postgresql://…` → `postgresql+asyncpg://…`. Usuario del pooler: `postgres.<PROJECT_REF>`.
-4. Añade `DATABASE_URL` en el `.env` de la raíz del repo (para `docker compose`) y, si corres la API con `uvicorn` fuera de Docker, en `apps/api/.env`.
-5. Al arrancar, la API ejecuta **Alembic** (`alembic upgrade head` vía `init_db()`): crea o actualiza tablas según [`apps/api/migrations/`](./apps/api/migrations/). Para aplicar migraciones a mano: `cd apps\api` y `alembic upgrade head` (requiere `DATABASE_URL` y driver sync `psycopg` instalado con el paquete).
+- **Tool calling** real con tres herramientas tipadas (`save_lead`, `get_lead_by_phone`, `request_human_handoff`) y loop con tope de 6 iteraciones.
+- **Multi-proveedor LLM**: alterna Gemini ↔ OpenAI desde el panel sin tocar código ni reiniciar.
+- **Idempotencia**: deduplicación por `MessageSid` de Twilio para sobrevivir reintentos.
+- **Validación criptográfica**: verificación de `X-Twilio-Signature` antes de procesar (configurable por entorno).
+- **Rate limiting** del webhook (120 req/min por IP, con backend Redis opcional para multi-réplica).
+- **Observabilidad**: logs estructurados JSON con `request_id`, métricas Prometheus, healthchecks `liveness`/`readiness`.
+- **Migraciones idempotentes** Alembic ejecutadas al arrancar la API.
+- **Panel sin código**: configurar secretos, catálogo (CSV/Excel parseado a líneas) y reglas desde la UI.
+- **Redacción de secretos en logs**: filtro que tacha `sk-*`, `AIza*`, Twilio tokens y `Bearer *` antes de escribir.
 
-Si la contraseña tiene caracteres reservados en URLs (`@`, `:`, `*`, etc.), codifícala (por ejemplo `@` como `%40`, `*` como `%2A`).
+## Arquitectura
 
-## Configuración desde el panel (Next.js)
+```
+WhatsApp (cliente)
+        ↓
+     Twilio
+        ↓ webhook POST (firma HMAC)
+   ┌──────────────────────────┐
+   │   FastAPI (apps/api)     │
+   │   • valida firma         │
+   │   • orquestador          │
+   │   • agente LLM + tools   │── Gemini / OpenAI
+   │   • rate-limit + métricas│
+   └────────┬─────────────────┘
+            │ SQLAlchemy async
+            ▼
+       Supabase (Postgres)
+            ▲
+            │ REST /internal/* (X-API-Key)
+   ┌────────┴────────┐
+   │  Next.js panel  │   ← operador humano
+   │  (apps/web)     │
+   └─────────────────┘
+```
 
-Abre **Configuración** en la barra superior del front (`/configuracion`). Ahí puedes:
+Diagrama y diseño completo en [`PLAN_WHATSAPP_AGENT.md`](./PLAN_WHATSAPP_AGENT.md).
 
-- Pegar **Account SID** y **Auth Token** de Twilio.
-- Indicar la **URL base** del túnel (HTTPS) y copiar la **URL completa del webhook** para pegarla en la consola de Twilio.
-- Activar o no la **validación de firma**.
-- Elegir **OpenAI** o **Google Gemini** (claves y modelos desde el panel; mismas herramientas: leads, handoff, etc.).
+---
 
-Los secretos se guardan en texto en la base de datos (cómodo para desarrollo); en producción usa un vault o solo variables de entorno.
+## Demo en 5 minutos
 
-## Arranque con Docker
+### Prerequisitos comunes
 
-```powershell
-cd D:\Proyectos\Wsp-Agent
-copy .env.example .env
-# Edita .env: DATABASE_URL (Supabase), Twilio, OpenAI si aplica
+- Docker Desktop (o Node 20+ y Python 3.12+ si lo corres en bare metal).
+- Un proyecto [Supabase](https://supabase.com/dashboard) (Free tier sobra).
+- **Una clave** de Gemini ([Google AI Studio](https://aistudio.google.com/app/apikey)) **o** de OpenAI. Para Gemini-only la demo es gratis.
 
+### Opción A — Solo el panel, sin WhatsApp real (1 minuto)
+
+Ideal para evaluar la UI y el modelo de datos sin tocar Twilio.
+
+```bash
+cp .env.example .env
+# Edita: DATABASE_URL (Supabase Session pooler con prefijo postgresql+asyncpg://)
 docker compose up --build
 ```
 
-Con **Supabase**, `DATABASE_URL` y (si lo necesitas) `DATABASE_SSL_VERIFY` van en el **`.env` de la raíz**; Compose **no** monta `apps/api/.env` en el contenedor `api`.
+Abre `http://localhost:3000`. Verás el panel vacío. Ve a **Configuración** y pega tu clave Gemini u OpenAI; el catálogo y las reglas las puedes pegar como texto plano o subir un CSV/Excel.
 
-- API: `GET http://localhost:8000/health` (ligero) y `GET http://localhost:8000/health/ready` (comprueba Postgres con `SELECT 1`; responde **503** si la base no está disponible — útil para balanceadores y Kubernetes). Todas las respuestas llevan cabecera **`X-Request-ID`** (UUID si no envías `X-Request-ID` / `X-Correlation-ID`); los logs de la API incluyen ese id en cada línea.
-- Web: http://localhost:3000  
-- Webhook Twilio (POST): `http://<tu-host>:8000/webhooks/twilio/whatsapp`  
-  En local usa un túnel (ngrok, Cloudflare Tunnel) y pon esa URL en Twilio y en `WEBHOOK_BASE_URL`.  
-  Ese endpoint tiene **límite de tasa** (120 solicitudes por minuto e IP) para mitigar abuso; en pruebas masivas usa varias IPs o ajusta el límite en código si lo necesitas.
+Para simular una conversación sin Twilio, inserta filas directamente en Supabase (`conversations`, `messages`) o llama al endpoint interno (ver [API interna](#api-interna-panel-next)).
 
-El contenedor de la API corre como usuario **no root** (`appuser`).
+### Opción B — End-to-end con Twilio Sandbox (5 minutos)
 
-## Arranque en desarrollo (sin Docker para la web)
-
-1. Define `DATABASE_URL` hacia tu proyecto Supabase (misma URI que en el `.env` de la raíz si ya usas Docker).
-2. API:
-
-   ```powershell
-   cd apps\api
-   copy .env.example .env
-   # Ajusta DATABASE_URL (Supabase, ver sección anterior)
-   pip install .
-   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+1. Replica los pasos de la opción A.
+2. Crea una cuenta Twilio, activa el **WhatsApp Sandbox** y anota el código de unión.
+3. Levanta un túnel HTTPS hacia `localhost:8000` (ngrok, Cloudflare Tunnel):
+   ```bash
+   ngrok http 8000
    ```
+4. En el panel `http://localhost:3000/configuracion`:
+   - Pega tu **Account SID** y **Auth Token** de Twilio.
+   - Pega la URL pública del túnel en **WEBHOOK_BASE_URL** (ej. `https://abc123.ngrok.app`).
+   - Copia la URL completa del webhook (la genera el panel) y pégala en Twilio → Sandbox → *When a message comes in*.
+5. Únete al sandbox desde tu WhatsApp con el código de Twilio y mándale un mensaje. Se verá en `http://localhost:3000/chats`.
 
-3. Web:
+> La firma HMAC sale por defecto en **false** para arranque rápido. Para producción ponla en `true` y asegúrate que `WEBHOOK_BASE_URL` coincida exactamente con la URL que Twilio llama (esquema, host y path).
 
-   ```powershell
-   cd apps\web
-   copy .env.example .env.local
-   npm run dev
-   ```
+---
 
-## Twilio (sandbox)
+## Lo que ves en el panel
 
-1. En la consola Twilio, en el sandbox de WhatsApp, configura el webhook **When a message comes in** a tu URL HTTPS + path `/webhooks/twilio/whatsapp`, método **POST**.
-2. Con `TWILIO_VALIDATE_SIGNATURE=false` puedes probar más rápido en local; en producción usa `true` y `WEBHOOK_BASE_URL` alineado con la URL registrada.
-3. Envía un mensaje al número del sandbox desde tu WhatsApp.
+| Ruta | Función |
+|------|---------|
+| `/` | Landing del panel. |
+| `/chats` | Lista de conversaciones recientes, búsqueda y filtros. |
+| `/chats/[id]` | Timeline de mensajes, notas internas, tags, lead asociado, botón **Escalar a humano** y resolver handoff. |
+| `/conversations`, `/conversations/[id]` | Vista alternativa de conversación. |
+| `/leads` | Leads capturados con sus campos estructurados y `qualification` JSONB. Exportable. |
+| `/configuracion` | Secretos Twilio/LLM, selector de proveedor (OpenAI / Gemini), modelo, catálogo (CSV/Excel → líneas), reglas, FAQ, tono. |
+| `/estado` | Versión de API, `GIT_COMMIT` del despliegue, salud de DB, status de Redis. |
+
+## Lo que hace el agente (tools)
+
+| Tool | Tipo | Para qué |
+|------|------|----------|
+| `save_lead` | Escritura | Upsert del lead asociado a la conversación: nombre, email, teléfono (E.164), empresa, ciudad, producto, presupuesto, notas, score. Cada llamada hace merge no destructivo con `qualification` JSONB. |
+| `get_lead_by_phone` | Lectura | Busca lead por teléfono normalizado para no repetir preguntas al cliente que vuelve. |
+| `request_human_handoff` | Escritura | Marca la conversación como `handed_off`, crea fila en `handoffs` con razón. El panel lo muestra en rojo. |
+
+El system prompt está armado en `apps/api/app/agent/tool_handlers.py::build_system_prompt` y se compone dinámicamente desde la configuración del panel (negocio, catálogo, precios, envíos, pagos, devoluciones, FAQ, tono, off-hours, datos a capturar).
 
 ## API interna (panel Next)
 
-Rutas bajo `/internal/*` requieren header `X-API-Key: <INTERNAL_API_KEY>`. Next.js las llama desde el servidor usando `BACKEND_URL` y la misma clave (ver `apps/web/src/lib/server-api.ts`). Las rutas BFF en `apps/web/src/app/api/internal/*` reenvían **`X-Request-ID`** al backend y, en error, devuelven JSON `{ "detail": ..., "request_id": "..." }` para enlazar con los logs de la API.
+Todas las rutas `/internal/*` requieren header `X-API-Key: $INTERNAL_API_KEY` (o `Authorization: Bearer …`). Next.js las consume desde el servidor con `BACKEND_URL` para no exponer la key al navegador.
 
-Página **Estado** (`/estado`): resume versión de API, commit de despliegue (`GIT_COMMIT`), comprobación de base y si hay **Redis** configurado para rate limit distribuido.
+| Método | Ruta | |
+|--------|------|---|
+| `GET` | `/internal/status` | Versión, commit, salud DB, Redis. |
+| `GET` | `/internal/conversations` | Lista paginada de conversaciones. |
+| `GET` | `/internal/conversations/{id}` | Detalle + mensajes. |
+| `PATCH` | `/internal/conversations/{id}/panel` | Notas internas, tags. |
+| `POST` | `/internal/conversations/{id}/handoff` | Marcar escalamiento. |
+| `POST` | `/internal/conversations/{id}/handoff/resolve` | Reabrir conversación. |
+| `GET` | `/internal/leads` | Lista de leads. |
+| `GET, PUT` | `/internal/settings` | Configuración del workspace. |
+| `POST` | `/internal/settings/agent-catalog/parse` | Parsea CSV/Excel → líneas para el catálogo. |
+| `POST` | `/webhooks/twilio/whatsapp` | **Público**, valida firma Twilio, rate-limit 120/min. |
+| `GET` | `/health`, `/health/ready`, `/metrics` | Liveness, readiness, Prometheus. |
 
-## CI (GitHub Actions)
+OpenAPI completo: `http://localhost:8000/docs` cuando la API corre.
 
-En pushes y PRs a `main`, el workflow [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) ejecuta:
-
-- **API**: Postgres 16 en servicio, `pip install ".[dev]"`, `python -m ruff check .`, `python -m pytest -q` (con `DATABASE_URL` y `INTERNAL_API_KEY` de prueba).
-- **Web**: `npm ci`, `npm run lint`, `npm run build`.
-
-Para correr los tests de la API en local necesitas una base accesible (por ejemplo Supabase o Postgres local) y `INTERNAL_API_KEY` coherente con tu `.env`; ver `apps/api/tests/conftest.py`.
-
-## Observabilidad, migraciones y DX
-
-- **Redis** (opcional en local; en `docker compose` hay un servicio `redis` y `REDIS_URL=redis://redis:6379/0` para que **slowapi** use almacenamiento compartido entre réplicas). Sin `REDIS_URL`, el límite del webhook queda en memoria del proceso.
-- **Métricas**: `GET http://localhost:8000/metrics` (Prometheus; restringe acceso en producción).
-- **Logs**: `LOG_JSON=true` para una línea JSON por evento (agregadores). `LOG_LEVEL` (p. ej. `INFO`). **No** loguees cuerpos de mensajes de usuario ni secretos en `logger.info`; usa `request_id` ya presente en el formato.
-- **OpenAPI → TypeScript**: tras cambiar la API, `cd apps\api && python scripts/export_openapi.py` y `cd apps\web && npm run gen:api-types` (genera `apps/web/src/lib/api-v1.d.ts` desde `apps/api/openapi.json`).
-- **Herramientas de repo**: en la raíz, [`package.json`](./package.json) con scripts `lint:api`, `test:api`, `export:openapi`, `gen:api-types`, etc. [Dependabot](.github/dependabot.yml) para pip/npm/Actions. [pre-commit](.pre-commit-config.yaml) con Ruff sobre `apps/api` (`pre-commit install`).
+---
 
 ## Stack
 
-- FastAPI, SQLAlchemy 2 async, asyncpg → Supabase Postgres (TLS automático si el host es `*.supabase.co` / pooler), Twilio (validación de firma), OpenAI (opcional), **Alembic** (migraciones), **slowapi** (rate limit; backend Redis opcional vía `REDIS_URL`), **prometheus-client** (`/metrics`).
-- Next.js 15 App Router, Tailwind.
+| Capa | Tecnología |
+|------|------------|
+| API | FastAPI, SQLAlchemy 2 async, asyncpg, slowapi (rate limit), prometheus-client |
+| Migraciones | Alembic + `init_db()` en startup |
+| Agente | `google-genai` (Gemini), `openai` (AsyncOpenAI), loop tool-calling con max 6 iteraciones, retry exponencial para cuotas |
+| Datos | Supabase (Postgres 16) — Session pooler con TLS automático |
+| Cola opcional | Redis (slowapi storage compartido entre réplicas) |
+| Frontend | Next.js 15 (App Router), Tailwind, BFF en `app/api/internal/*` |
+| Mensajería | Twilio WhatsApp Sandbox (dev) / Business API (prod) |
+| CI | GitHub Actions (`api` Postgres 16 + Ruff + pytest, `web` ESLint + build), Dependabot pip/npm/Actions |
+| Hooks | pre-commit con Ruff |
+
+---
+
+## Limitaciones (es un demo)
+
+Estas son **decisiones explícitas** para mantener el demo simple y barato. Para pilot / producción ver la sección siguiente.
+
+- **Single-tenant**: cualquier holder de `INTERNAL_API_KEY` lee todas las conversaciones y leads. No hay scoping por `workspace_id`. Ver docstring en `apps/api/app/deps.py::verify_internal_api_key`.
+- **Secretos en texto plano** dentro de Supabase para los que se guardan desde el panel (Twilio Token, OpenAI/Gemini key). Cómodo para dev; **no** para producción.
+- **TwiML síncrono**: la respuesta se envía dentro del mismo ciclo del webhook. Si el LLM tarda >10–15 s Twilio puede agotar el timeout. Sin cola async, sin worker.
+- **Sin timeout explícito** en las llamadas al LLM (sólo retry para cuotas).
+- **Tests solo unitarios** con mocks; CI no levanta el orquestador completo contra una DB real.
+- **CORS permisivo**: `allow_methods=["*"]`, `allow_headers=["*"]` en `apps/api/app/main.py`.
+- **Sin redacción de payload Twilio**: el JSON crudo del webhook se almacena en `messages.raw_payload`; útil para debugging, pero ten en cuenta que contiene el cuerpo del mensaje del cliente.
+
+## De demo a pilot a producción
+
+| Etapa | Estado | Qué falta |
+|-------|--------|-----------|
+| **Demo** | Listo | (este README, CI verde, Gemini-only o sandbox Twilio) |
+| **Pilot interno** | ~50% | Migrar secretos del panel a vault, escribir tests de integración con DB real, decidir TwiML sync vs cola async, agregar `asyncio.timeout()` a las llamadas LLM. |
+| **Producción multi-tenant** | ~25% | `workspace_id` en BD + emisión de keys por workspace, scoping en `/internal/*`, CORS estricto, monitoreo de costos LLM, backups DB, rotación de keys, observabilidad de tracing distribuido, runbooks. **Backlog detallado en [`TODO_PRODUCTION.md`](./TODO_PRODUCTION.md)**. |
+
+Cierre del audit completo en [`PLAN_WHATSAPP_AGENT.md`](./PLAN_WHATSAPP_AGENT.md) sección 12 (Riesgos) y 13 (Criterios de listo para demo). Roadmap de hardening en [`TODO_PRODUCTION.md`](./TODO_PRODUCTION.md).
+
+---
+
+## Estructura del repo
+
+```
+.
+├── apps/
+│   ├── api/                    FastAPI + agente + migraciones
+│   │   ├── app/
+│   │   │   ├── agent/          gemini_agent, tool_handlers, system prompt
+│   │   │   ├── routers/        internal.py, workspace_settings.py
+│   │   │   ├── webhooks/       twilio_whatsapp.py
+│   │   │   ├── services/       orchestrator, conversation, effective_settings
+│   │   │   ├── models/         SQLAlchemy: Conversation, Message, Lead, Handoff, ToolInvocation
+│   │   │   ├── middleware/     correlation_id (X-Request-ID)
+│   │   │   ├── logging_setup.py   incluye SecretRedactionFilter
+│   │   │   ├── deps.py         verify_internal_api_key
+│   │   │   ├── metrics.py      Prometheus
+│   │   │   └── main.py
+│   │   ├── migrations/         Alembic
+│   │   ├── tests/              pytest unitarios
+│   │   ├── scripts/            check_db, export_openapi
+│   │   └── pyproject.toml
+│   └── web/                    Next.js 15 App Router, Tailwind
+│       └── src/app/
+│           ├── chats/          conversaciones, detalle
+│           ├── leads/
+│           ├── configuracion/
+│           ├── estado/
+│           └── api/internal/   BFF que reenvía a FastAPI con la key
+├── supabase/migrations/        Alternativa SQL plano si no quieres Alembic
+├── docker-compose.yml          api, web, redis
+├── .env.example                root (Compose)
+├── .pre-commit-config.yaml     Ruff
+└── PLAN_WHATSAPP_AGENT.md      Diseño y fases
+```
+
+## Reference: configuración detallada
+
+### Variables de entorno
+
+| Ámbito | Variable | Default | Notas |
+|--------|----------|---------|-------|
+| Root / Compose | `DATABASE_URL` | _vacío_ | Session pooler de Supabase con prefijo `postgresql+asyncpg://`. Codifica `@→%40`, `*→%2A`. |
+| Root | `INTERNAL_API_KEY` | `dev-internal-key` | Cambiala. La usa el panel y `/internal/*`. |
+| API | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | _vacío_ | Si las dejas vacías y las pegas en el panel, las del panel ganan. |
+| API | `TWILIO_VALIDATE_SIGNATURE` | `false` | **Pon `true` en producción**. |
+| API | `WEBHOOK_BASE_URL` | `http://localhost:8000` | Debe coincidir exactamente con la URL que Twilio llama (para HMAC). |
+| API | `OPENAI_API_KEY` | _vacío_ | Opcional, el panel la sobreescribe. |
+| API | `REDIS_URL` | `redis://redis:6379/0` | Vacío = rate limit en memoria del proceso. |
+| API | `LOG_JSON` | `false` | `true` para agregadores. |
+| API | `LOG_LEVEL` | `INFO` | |
+| API | `GIT_COMMIT` | `local` | Inyectado por CI/CD para mostrar en `/estado`. |
+| API | `CORS_ORIGINS` | `http://localhost:3000` | Lista separada por coma. |
+| Web | `BACKEND_URL` | `http://api:8000` | Server-side fetch. |
+| Web | `INTERNAL_API_KEY` | igual que API | Para que `/api/internal/*` reenvíe. |
+
+### Modelo de seguridad: single-tenant
+
+`/internal/*` está pensado para **un único panel detrás del shared secret**. Quien presente la `INTERNAL_API_KEY` válida lee **todas** las conversaciones, mensajes, leads y handoffs del despliegue — no hay filtro por `workspace_id`/`tenant_id` en las rutas internas (ver `apps/api/app/deps.py::verify_internal_api_key`).
+
+Implicaciones:
+
+- **Aceptable** para un pilot interno donde el Next.js es el único consumidor.
+- **NO** compartas `INTERNAL_API_KEY` con clientes externos ni la incluyas en JS de navegador.
+- Para multi-tenant: modelar `workspace_id` en BD, emitir keys por workspace y filtrar en `apps/api/app/routers/internal.py`.
+
+### Arranque sin Docker
+
+```bash
+# API
+cd apps/api
+python3.12 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+DATABASE_URL=postgresql+asyncpg://... INTERNAL_API_KEY=dev-internal-key \
+  uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# Web (en otra terminal)
+cd apps/web
+cp .env.example .env.local && npm install
+BACKEND_URL=http://localhost:8000 INTERNAL_API_KEY=dev-internal-key npm run dev
+```
+
+### CI
+
+`.github/workflows/ci.yml` corre en push y PR a `main`:
+
+- **api**: Postgres 16 service, `pip install ".[dev]"`, `ruff check .`, `pytest -q` con `DATABASE_URL` y `INTERNAL_API_KEY` de prueba.
+- **web**: `npm ci`, `npm run lint`, `npm run build`.
+
+Para correr la suite de la API en local: necesitas una DB accesible y `INTERNAL_API_KEY` coherente con tu `.env`. Ver `apps/api/tests/conftest.py`.
+
+### Observabilidad
+
+- **Logs**: `LOG_JSON=true` para una línea JSON por evento; cada record incluye `request_id`. El filtro `SecretRedactionFilter` tacha `sk-*`, `AIza*`, Twilio tokens y `Bearer *` antes de salir.
+- **Métricas**: `GET /metrics` (Prometheus). Restringe acceso en producción.
+- **Trazas**: `X-Request-ID` (o `X-Correlation-ID`) ida y vuelta entre Next.js BFF y FastAPI.
+- **Health**: `/health` (liveness ligero), `/health/ready` (verifica `SELECT 1` y devuelve 503 si la base no responde).
+
+### Generación de tipos TypeScript desde OpenAPI
+
+Después de cambiar la API:
+
+```bash
+cd apps/api && python scripts/export_openapi.py
+cd ../web && npm run gen:api-types
+```
+
+Genera `apps/web/src/lib/api-v1.d.ts` desde `apps/api/openapi.json`.
+
+---
+
+## Documentación adicional
+
+- [`PLAN_WHATSAPP_AGENT.md`](./PLAN_WHATSAPP_AGENT.md) — diseño completo, fases, decisiones.
+- [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) — pipeline CI.
+- [`.github/dependabot.yml`](./.github/dependabot.yml) — actualizaciones automáticas pip/npm/Actions.
 
 ## Licencia
 
-Uso interno / proyecto de aprendizaje — añade la licencia que prefieras.
+Proyecto de demostración / aprendizaje — añade la licencia que prefieras.

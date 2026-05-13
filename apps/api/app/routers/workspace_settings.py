@@ -49,7 +49,10 @@ class CatalogParseOut(BaseModel):
 
 
 class SettingsUpdate(BaseModel):
-    """Solo se actualizan campos enviados. Cadena vacía en secretos borra el valor guardado en BD (vuelve al .env)."""
+    """Solo se actualizan campos enviados. Cadena vacía en secretos borra el valor guardado.
+
+    Cuando un secreto se borra en BD, el valor cae de nuevo al .env.
+    """
 
     twilio_account_sid: str | None = Field(default=None)
     twilio_auth_token: str | None = Field(default=None)
@@ -112,7 +115,7 @@ async def get_workspace_settings(db: Annotated[AsyncSession, Depends(get_db)]) -
 async def parse_agent_catalog_upload(
     file: UploadFile = File(...),
 ) -> CatalogParseOut:
-    """Convierte CSV o Excel (.xlsx) en líneas «celda | celda | …» para pegar en el catálogo del agente."""
+    """Convierte CSV o Excel (.xlsx) en líneas «celda | celda | …» para pegar en el catálogo."""
     raw = await file.read()
     try:
         fragment, n, ft = parse_catalog_bytes(raw, file.filename or "")

@@ -40,7 +40,7 @@ def _sync_url_for_alembic(url: str) -> str:
 
 
 def _escape_percent_for_configparser(value: str) -> str:
-    """Alembic stores sqlalchemy.url in ConfigParser, which treats % as interpolation (e.g. %2A in passwords)."""
+    """Escape % so Alembic's ConfigParser does not treat %2A in passwords as interpolation."""
     return value.replace("%", "%%")
 
 

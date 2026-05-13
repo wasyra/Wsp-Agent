@@ -1,7 +1,7 @@
-"""Comprueba DATABASE_URL (Supabase/Postgres). Ejecutar: python scripts/check_db.py desde apps/api."""
-import ssl
+"""Comprueba DATABASE_URL (Supabase/Postgres). Ejecutar `python scripts/check_db.py` en apps/api."""
 
 import asyncio
+import ssl
 
 from sqlalchemy import text
 
@@ -15,8 +15,7 @@ async def main() -> None:
         rows = (
             await conn.execute(
                 text(
-                    "SELECT tablename FROM pg_tables "
-                    "WHERE schemaname = 'public' ORDER BY tablename"
+                    "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename"
                 )
             )
         ).fetchall()
@@ -44,19 +43,23 @@ if __name__ == "__main__":
         asyncio.run(main())
     except ssl.SSLError as e:
         print(
-            "Error TLS/SSL:", e, "\n"
+            "Error TLS/SSL:",
+            e,
+            "\n"
             "Si es antivirus/proxy corporativo, en apps/api/.env prueba:\n"
             "  DATABASE_SSL_VERIFY=false\n"
-            "(solo desarrollo; en producción arregla la cadena de confianza.)"
+            "(solo desarrollo; en producción arregla la cadena de confianza.)",
         )
         raise SystemExit(1) from e
     except OSError as e:
         errno = getattr(e, "errno", None)
         if errno == 11001:
             print(
-                "DNS fallo (getaddrinfo). En Windows suele pasar con db.<ref>.supabase.co (solo IPv6).\n"
+                "DNS fallo (getaddrinfo). En Windows suele pasar con db.<ref>.supabase.co "
+                "(solo IPv6).\n"
                 "Usa el pooler en DATABASE_URL (IPv4), p. ej.:\n"
-                "  postgresql+asyncpg://postgres.<REF>:PASSWORD@aws-0-<REGION>.pooler.supabase.com:5432/postgres\n"
+                "  postgresql+asyncpg://postgres.<REF>:PASSWORD@"
+                "aws-0-<REGION>.pooler.supabase.com:5432/postgres\n"
                 "Codifica caracteres especiales en la contraseña (* → %2A, @ → %40)."
             )
         else:
@@ -66,8 +69,10 @@ if __name__ == "__main__":
         msg = str(e)
         if "Tenant or user not found" in msg:
             print(
-                "Supavisor: el host del pooler no corresponde a tu proyecto (muy comun con aws-0 vs aws-1).\n"
-                "Abre el proyecto en Supabase → boton Connect → Session pooler y copia el host de la URI (p. ej. aws-1-us-east-1...)."
+                "Supavisor: el host del pooler no corresponde a tu proyecto "
+                "(muy comun con aws-0 vs aws-1).\n"
+                "Abre el proyecto en Supabase → boton Connect → Session pooler y copia el "
+                "host de la URI (p. ej. aws-1-us-east-1...)."
             )
         else:
             print("Error de conexion o credenciales (revisa DATABASE_URL en apps/api/.env):", e)

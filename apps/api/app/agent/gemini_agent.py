@@ -39,16 +39,19 @@ def gemini_quota_user_message(exc: BaseException | None = None) -> str:
     low = raw.lower()
     if "limit: 0" in low or "limit:0" in low:
         return (
-            "Google respondió con cuota «limit: 0» para este modelo en tu proyecto: a veces hace "
-            "falta activar facturación en Google Cloud / AI Studio (puede seguir siendo uso gratuito "
-            "con límites). Prueba en Configuración el modelo gemini-2.5-flash o gemini-flash-latest. "
-            "https://ai.google.dev/gemini-api/docs/rate-limits — O usa OpenAI en Configuración."
+            "Google respondió con cuota «limit: 0» para este modelo en tu proyecto: a veces "
+            "hace falta activar facturación en Google Cloud / AI Studio (puede seguir siendo "
+            "uso gratuito con límites). Prueba en Configuración el modelo gemini-2.5-flash o "
+            "gemini-flash-latest. https://ai.google.dev/gemini-api/docs/rate-limits — "
+            "O usa OpenAI en Configuración."
         )
     if "gemini-2.0-flash" in low and "gemini-2.5" not in low:
         return (
             "Cuota agotada o no disponible para gemini-2.0-flash en tu proyecto. "
-            "En Configuración cambia el modelo a gemini-2.5-flash (recomendado ahora en API pública) "
-            "o gemini-flash-latest, guarda y reintenta. " + base.split("—")[0].strip() + "."
+            "En Configuración cambia el modelo a gemini-2.5-flash (recomendado ahora en API "
+            "pública) o gemini-flash-latest, guarda y reintenta. "
+            + base.split("—")[0].strip()
+            + "."
         )
     return base
 
@@ -67,11 +70,7 @@ def _looks_like_quota_error(exc: BaseException) -> bool:
             or "too many requests" in low
             or "generate_content_free_tier" in low.replace("_", "")
         )
-    ) or (
-        "quota" in low
-        and "exceeded" in low
-        and ("generativelanguage" in low or "gemini" in low)
-    )
+    ) or ("quota" in low and "exceeded" in low and ("generativelanguage" in low or "gemini" in low))
 
 
 def _quota_daily_exhausted(exc: BaseException) -> bool:
@@ -190,9 +189,7 @@ async def generate_with_gemini(
                     parts=[types.Part.from_text(text=text)],
                 )
             )
-        contents.append(
-            types.Content(role="user", parts=[types.Part.from_text(text=last_user)])
-        )
+        contents.append(types.Content(role="user", parts=[types.Part.from_text(text=last_user)]))
 
         tool = _build_gemini_tool()
         config = types.GenerateContentConfig(
@@ -261,8 +258,11 @@ async def generate_with_gemini(
                     config=config,
                 )
 
-            return "No pude completar la solicitud en este momento. Intenta de nuevo en unos minutos."
+            return (
+                "No pude completar la solicitud en este momento. Intenta de nuevo en unos minutos."
+            )
         finally:
+
             def _close() -> None:
                 client.close()
 

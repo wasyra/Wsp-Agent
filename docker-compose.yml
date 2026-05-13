@@ -1,26 +1,11 @@
 services:
-  db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: wsp
-      POSTGRES_PASSWORD: wsp
-      POSTGRES_DB: wsp_agent
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wsp -d wsp_agent"]
-      interval: 3s
-      timeout: 5s
-      retries: 10
-
   api:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql+asyncpg://wsp:wsp@db:5432/wsp_agent
+      DATABASE_URL: ${DATABASE_URL:?Define DATABASE_URL in root .env (Supabase Session pooler URI, postgresql+asyncpg://...)}
+      DATABASE_SSL_VERIFY: ${DATABASE_SSL_VERIFY:-true}
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
       TWILIO_VALIDATE_SIGNATURE: ${TWILIO_VALIDATE_SIGNATURE:-false}
@@ -30,9 +15,6 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
     ports:
       - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
 
   web:
     build:
@@ -45,6 +27,3 @@ services:
       - "3000:3000"
     depends_on:
       - api
-
-volumes:
-  pgdata:

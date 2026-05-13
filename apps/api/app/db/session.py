@@ -1,3 +1,4 @@
+import ssl
 from collections.abc import AsyncGenerator
 
 from sqlalchemy import text
@@ -7,11 +8,26 @@ from app.config import get_settings
 from app.db.base import Base
 
 settings = get_settings()
-engine = create_async_engine(
-    settings.database_url,
-    echo=False,
-    pool_pre_ping=True,
-)
+
+
+def _asyncpg_connect_args(database_url: str, ssl_verify: bool) -> dict | None:
+    """Supabase (y otros Postgres en la nube) exigen TLS; asyncpg no siempre lo infiere del URL."""
+    if "supabase.co" in database_url or "pooler.supabase.com" in database_url:
+        if ssl_verify:
+            return {"ssl": ssl.create_default_context()}
+        insecure = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        insecure.check_hostname = False
+        insecure.verify_mode = ssl.CERT_NONE
+        return {"ssl": insecure}
+    return None
+
+
+_engine_kwargs: dict = {"echo": False, "pool_pre_ping": True}
+_ca = _asyncpg_connect_args(settings.database_url, settings.database_ssl_verify)
+if _ca:
+    _engine_kwargs["connect_args"] = _ca
+
+engine = create_async_engine(settings.database_url, **_engine_kwargs)
 SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 _APP_CONFIGURATION_ALTER = (

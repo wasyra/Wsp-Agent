@@ -1197,7 +1197,7 @@ export default function ConfiguracionPage() {
 
             {settingsTab === "general" ? (
               <section className="rounded-2xl border border-amber-500/35 bg-amber-950/35 p-4 text-sm text-amber-50">
-                <strong>Importante:</strong> guardar secretos en PostgreSQL es cómodo para
+                <strong>Importante:</strong> guardar secretos en la base de datos (Supabase) es cómodo para
                 desarrollo; en producción valora cifrar, usar un vault o solo variables de entorno.
               </section>
             ) : null}

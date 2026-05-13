@@ -1,12 +1,27 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str = "postgresql+asyncpg://wsp:wsp@localhost:5432/wsp_agent"
+    # Supabase Session pooler (postgresql+asyncpg://...). Obligatorio en .env — ver README.
+    database_url: str
+
+    # Solo si TLS falla (p. ej. antivirus/proxy con certificado propio). En producción dejar true.
+    database_ssl_verify: bool = True
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def database_url_non_empty(cls, v: object) -> object:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            raise ValueError(
+                "DATABASE_URL debe estar definida (URI Session pooler de Supabase, postgresql+asyncpg://...). "
+                "Ver README."
+            )
+        return v
 
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""

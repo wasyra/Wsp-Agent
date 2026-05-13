@@ -258,7 +258,7 @@ Alternativa: dos repos (`wsp-agent-api`, `wsp-agent-web`) si el equipo lo prefie
 ## 9. Docker
 
 - **Servicio `api`**: imagen Python, uvicorn, puerto 8000.
-- **Servicio `db`**: PostgreSQL 16, volumen nombrado.
+- **Supabase**: Postgres gestionado (connection string Session pooler en `.env`).
 - **Opcional `redis`**: cola/locks.
 - **Servicio `web`**: build Next, puerto 3000, depende de `api` solo para orden de arranque.
 

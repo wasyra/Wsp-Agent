@@ -181,9 +181,9 @@ Estas son **decisiones explícitas** para mantener el demo simple y barato. Para
 |-------|--------|-----------|
 | **Demo** | Listo | (este README, CI verde, Gemini-only o sandbox Twilio) |
 | **Pilot interno** | ~50% | Migrar secretos del panel a vault, escribir tests de integración con DB real, decidir TwiML sync vs cola async, agregar `asyncio.timeout()` a las llamadas LLM. |
-| **Producción multi-tenant** | ~25% | `workspace_id` en BD + emisión de keys por workspace, scoping en `/internal/*`, CORS estricto, monitoreo de costos LLM, backups DB, rotación de keys, observabilidad de tracing distribuido, runbooks. |
+| **Producción multi-tenant** | ~25% | `workspace_id` en BD + emisión de keys por workspace, scoping en `/internal/*`, CORS estricto, monitoreo de costos LLM, backups DB, rotación de keys, observabilidad de tracing distribuido, runbooks. **Backlog detallado en [`TODO_PRODUCTION.md`](./TODO_PRODUCTION.md)**. |
 
-Cierre del audit completo en [`PLAN_WHATSAPP_AGENT.md`](./PLAN_WHATSAPP_AGENT.md) sección 12 (Riesgos) y 13 (Criterios de listo para demo).
+Cierre del audit completo en [`PLAN_WHATSAPP_AGENT.md`](./PLAN_WHATSAPP_AGENT.md) sección 12 (Riesgos) y 13 (Criterios de listo para demo). Roadmap de hardening en [`TODO_PRODUCTION.md`](./TODO_PRODUCTION.md).
 
 ---
 

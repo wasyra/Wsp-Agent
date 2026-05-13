@@ -91,6 +91,18 @@ Rutas bajo `/internal/*` requieren header `X-API-Key: <INTERNAL_API_KEY>`. Next.
 
 Página **Estado** (`/estado`): resume versión de API, commit de despliegue (`GIT_COMMIT`), comprobación de base y si hay **Redis** configurado para rate limit distribuido.
 
+### Modelo de seguridad: single-tenant
+
+`/internal/*` está pensado para **un único panel detrás del shared secret**. Quien presente la `INTERNAL_API_KEY` válida lee **todas** las conversaciones, mensajes, leads y handoffs del despliegue — no hay filtro por `workspace_id`/`tenant_id` en las rutas internas (ver docstring en `apps/api/app/deps.py::verify_internal_api_key`).
+
+Implicaciones:
+
+- **Aceptable** para un pilot interno donde el Next.js es el único consumidor.
+- **NO** compartas `INTERNAL_API_KEY` con clientes externos ni la incluyas en JS de navegador.
+- Para multi-tenant: modelar `workspace_id` en BD, emitir keys por workspace y filtrar en `apps/api/app/routers/internal.py`.
+
+Los **secretos del panel** (Twilio Auth Token, OpenAI/Gemini API keys) se guardan **en texto plano en Supabase** para comodidad de desarrollo. Para producción rota a un vault (AWS Secrets Manager, GCP Secret Manager, etc.) y deja la BD solo con referencias.
+
 ## CI (GitHub Actions)
 
 En pushes y PRs a `main`, el workflow [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) ejecuta:

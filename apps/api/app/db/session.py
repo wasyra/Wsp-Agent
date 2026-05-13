@@ -1,11 +1,12 @@
 import ssl
 from collections.abc import AsyncGenerator
+from pathlib import Path
 
-from sqlalchemy import text
+from alembic import command
+from alembic.config import Config
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import get_settings
-from app.db.base import Base
 
 settings = get_settings()
 
@@ -30,26 +31,17 @@ if _ca:
 engine = create_async_engine(settings.database_url, **_engine_kwargs)
 SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-_APP_CONFIGURATION_ALTER = (
-    "ALTER TABLE app_configuration ADD COLUMN IF NOT EXISTS llm_provider VARCHAR(16)",
-    "ALTER TABLE app_configuration ADD COLUMN IF NOT EXISTS gemini_api_key TEXT",
-    "ALTER TABLE app_configuration ADD COLUMN IF NOT EXISTS gemini_model VARCHAR(64)",
-    "ALTER TABLE app_configuration ADD COLUMN IF NOT EXISTS agent_business_summary TEXT",
-    "ALTER TABLE app_configuration ADD COLUMN IF NOT EXISTS agent_instructions TEXT",
-    "ALTER TABLE app_configuration ADD COLUMN IF NOT EXISTS agent_lead_capture TEXT",
-    "ALTER TABLE app_configuration ADD COLUMN IF NOT EXISTS agent_catalog TEXT",
-    "ALTER TABLE app_configuration ADD COLUMN IF NOT EXISTS agent_pricing_rules TEXT",
-    "ALTER TABLE app_configuration ADD COLUMN IF NOT EXISTS agent_shipping_zones TEXT",
-    "ALTER TABLE app_configuration ADD COLUMN IF NOT EXISTS agent_payment_methods TEXT",
-    "ALTER TABLE app_configuration ADD COLUMN IF NOT EXISTS agent_returns_warranty TEXT",
-    "ALTER TABLE app_configuration ADD COLUMN IF NOT EXISTS agent_faq TEXT",
-    "ALTER TABLE app_configuration ADD COLUMN IF NOT EXISTS agent_off_hours_message TEXT",
-    "ALTER TABLE app_configuration ADD COLUMN IF NOT EXISTS agent_hard_rules TEXT",
-    "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS internal_notes TEXT",
-    "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS internal_tags JSONB",
-    "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_agent_llm_status VARCHAR(16) DEFAULT 'ok'",
-    "ALTER TABLE conversations ADD COLUMN IF NOT EXISTS last_agent_llm_error TEXT",
-)
+
+def _sync_url_for_alembic(url: str) -> str:
+    u = url.strip()
+    if "+asyncpg" in u:
+        return u.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
+    return u
+
+
+def _escape_percent_for_configparser(value: str) -> str:
+    """Alembic stores sqlalchemy.url in ConfigParser, which treats % as interpolation (e.g. %2A in passwords)."""
+    return value.replace("%", "%%")
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -61,10 +53,13 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        for stmt in _APP_CONFIGURATION_ALTER:
-            await conn.execute(text(stmt))
+    """Aplica migraciones Alembic (esquema versionado) y asegura fila de configuración."""
+    alembic_ini = Path(__file__).resolve().parents[2] / "alembic.ini"
+    alembic_cfg = Config(str(alembic_ini))
+    sync_url = _sync_url_for_alembic(settings.database_url)
+    alembic_cfg.set_main_option("sqlalchemy.url", _escape_percent_for_configparser(sync_url))
+    command.upgrade(alembic_cfg, "head")
+
     from app.services.effective_settings import ensure_app_config_row
 
     async with SessionLocal() as session:

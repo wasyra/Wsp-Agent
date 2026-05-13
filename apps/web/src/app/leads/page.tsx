@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { LeadsExportButton } from "@/components/LeadsExportButton";
 import { fetchLeads } from "@/lib/server-api";
 
 type PageProps = {
@@ -200,7 +201,14 @@ export default async function LeadsPage({ searchParams }: PageProps) {
         ) : null}
 
         {rows.length > 0 ? (
-          <div className="mt-8 overflow-x-auto rounded-2xl border border-[var(--wa-border)] bg-[var(--wa-panel)] shadow-xl">
+          <div className="mt-8 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs text-[var(--wa-text-muted)]">
+                Mostrando {rows.length} fila{rows.length === 1 ? "" : "s"} (máx. 300 con los filtros actuales).
+              </p>
+              <LeadsExportButton rows={rows} />
+            </div>
+            <div className="overflow-x-auto rounded-2xl border border-[var(--wa-border)] bg-[var(--wa-panel)] shadow-xl">
             <table className="w-full min-w-[640px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-[var(--wa-border)] bg-black/25 text-[var(--wa-text-muted)]">
@@ -249,6 +257,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         ) : null}
       </div>

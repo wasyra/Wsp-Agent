@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import os
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import and_, exists, func, or_, select
+from sqlalchemy import and_, exists, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -69,6 +70,8 @@ class ConversationSummary(BaseModel):
     updated_at: datetime
     message_count: int
     last_agent_llm_status: str
+    has_pending_handoff: bool = False
+    last_agent_llm_error_snippet: str | None = None
 
 
 class HandoffBrief(BaseModel):
@@ -120,6 +123,13 @@ class HandoffOut(BaseModel):
     reason: str
     status: str
     created_at: datetime
+
+
+class DeploymentStatus(BaseModel):
+    api_version: str
+    git_commit: str
+    database: str
+    redis_configured: bool = False
 
 
 def _utc_day_start(d: date) -> datetime:
@@ -188,6 +198,17 @@ def _conversation_filters(
     return conds
 
 
+@router.get("/status", response_model=DeploymentStatus)
+async def deployment_status(db: Annotated[AsyncSession, Depends(get_db)]) -> DeploymentStatus:
+    await db.execute(text("SELECT 1"))
+    return DeploymentStatus(
+        api_version="0.1.0",
+        git_commit=os.environ.get("GIT_COMMIT", "unknown"),
+        database="ok",
+        redis_configured=bool(os.environ.get("REDIS_URL", "").strip()),
+    )
+
+
 @router.get("/conversations", response_model=list[ConversationSummary])
 async def list_conversations(
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -203,9 +224,20 @@ async def list_conversations(
         .group_by(Message.conversation_id)
         .subquery()
     )
-    stmt = select(Conversation, func.coalesce(count_sq.c.cnt, 0).label("message_count")).outerjoin(
-        count_sq, count_sq.c.conversation_id == Conversation.id
+    handoff_pending_sq = (
+        select(1)
+        .select_from(Handoff)
+        .where(
+            Handoff.conversation_id == Conversation.id,
+            Handoff.status == HandoffStatus.pending,
+        )
+        .exists()
     )
+    stmt = select(
+        Conversation,
+        func.coalesce(count_sq.c.cnt, 0).label("message_count"),
+        handoff_pending_sq.label("has_pending_handoff"),
+    ).outerjoin(count_sq, count_sq.c.conversation_id == Conversation.id)
     conds = _conversation_filters(q=q, status=status, date_from=date_from, date_to=date_to)
     if conds:
         stmt = stmt.where(and_(*conds))
@@ -213,8 +245,13 @@ async def list_conversations(
     result = await db.execute(stmt)
     rows = result.all()
     out: list[ConversationSummary] = []
-    for conv, msg_count in rows:
+    for conv, msg_count, has_ph in rows:
         llm = getattr(conv, "last_agent_llm_status", None) or "ok"
+        err = getattr(conv, "last_agent_llm_error", None)
+        snippet: str | None = None
+        if err:
+            s = str(err).strip()
+            snippet = s[:200] + ("…" if len(s) > 200 else "")
         out.append(
             ConversationSummary(
                 id=conv.id,
@@ -224,6 +261,8 @@ async def list_conversations(
                 updated_at=conv.updated_at,
                 message_count=int(msg_count or 0),
                 last_agent_llm_status=str(llm),
+                has_pending_handoff=bool(has_ph),
+                last_agent_llm_error_snippet=snippet,
             )
         )
     return out
@@ -390,3 +429,29 @@ async def create_handoff(
     await db.commit()
     await db.refresh(ho)
     return HandoffOut.model_validate(ho)
+
+
+@router.post("/conversations/{conversation_id}/handoff/resolve")
+async def resolve_pending_handoff(
+    conversation_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, object]:
+    """Marca todos los handoffs pendientes como resueltos y reabre la conversación si estaba en handed_off."""
+    stmt = select(Handoff).where(
+        Handoff.conversation_id == conversation_id,
+        Handoff.status == HandoffStatus.pending,
+    )
+    result = await db.execute(stmt)
+    pending_list = list(result.scalars().all())
+    if not pending_list:
+        raise HTTPException(status_code=404, detail="No hay escalado pendiente para esta conversación")
+    now = datetime.now(timezone.utc)
+    for h in pending_list:
+        h.status = HandoffStatus.resolved
+        h.resolved_at = now
+    conv_row = await db.execute(select(Conversation).where(Conversation.id == conversation_id))
+    conv = conv_row.scalar_one_or_none()
+    if conv is not None and conv.status == ConversationStatus.handed_off:
+        conv.status = ConversationStatus.open
+    await db.commit()
+    return {"ok": True, "resolved_count": len(pending_list)}

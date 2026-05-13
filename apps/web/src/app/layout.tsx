@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 
 import { AppNav } from "@/components/AppNav";
+import { AppTour } from "@/components/AppTour";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -36,6 +37,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${plusJakarta.variable} min-h-screen antialiased`}
       >
         <AppNav />
+        <AppTour />
         {children}
       </body>
     </html>

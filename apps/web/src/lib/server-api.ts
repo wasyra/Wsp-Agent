@@ -2,6 +2,7 @@ import { getBackendUrl, getInternalApiKey } from "@/lib/env";
 
 const internalHeaders = (): HeadersInit => ({
   "X-API-Key": getInternalApiKey(),
+  "X-Request-ID": typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `srv-${Date.now()}`,
 });
 
 export type ConversationSummary = {
@@ -12,6 +13,8 @@ export type ConversationSummary = {
   updated_at: string;
   message_count: number;
   last_agent_llm_status: string;
+  has_pending_handoff?: boolean;
+  last_agent_llm_error_snippet?: string | null;
 };
 
 export type ConversationDetail = {

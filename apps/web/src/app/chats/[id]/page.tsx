@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { ChatDetailRefresh } from "@/components/ChatDetailRefresh";
 import { ConversationNotesPanel } from "@/components/ConversationNotesPanel";
 import { HandoffButton } from "@/components/HandoffButton";
 import { LeadQualificationChips } from "@/components/LeadQualificationChips";
+import { ResolveHandoffButton } from "@/components/ResolveHandoffButton";
 import { fetchConversation } from "@/lib/server-api";
 import { waAvatarGlyph, waAvatarHue, waChatTitle } from "@/lib/wa-display";
 
@@ -23,9 +25,15 @@ export default async function ChatDetailPage({ params }: Props) {
   const hue = waAvatarHue(data.twilio_from);
   const llmBad = (data.last_agent_llm_status || "ok").toLowerCase() !== "ok";
   const showHandoffStrip = data.pending_handoff || data.status === "handed_off";
+  const lastMsg = data.messages.length ? data.messages[data.messages.length - 1]! : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <ChatDetailRefresh
+        conversationId={data.id}
+        initialUpdatedAt={data.updated_at}
+        initialLastMessageId={lastMsg?.id ?? ""}
+      />
       <header className="flex shrink-0 items-center gap-3 border-b border-white/[0.06] bg-gradient-to-b from-[#1e2a32] to-[var(--wa-panel)] px-3 py-2 shadow-lg sm:px-4">
         <Link
           href="/chats"
@@ -47,15 +55,35 @@ export default async function ChatDetailPage({ params }: Props) {
           <h1 className="font-[family-name:var(--font-display)] truncate text-base font-semibold text-white sm:text-[17px]">
             {title}
           </h1>
-          <p className="truncate text-[11px] text-[var(--wa-text-muted)]">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 truncate text-[11px] text-[var(--wa-text-muted)]">
             {data.status === "open" ? (
               <span className="text-[var(--wa-accent-soft)]">● </span>
             ) : null}
-            {data.status}
+            <span>{data.status}</span>
             {llmBad ? (
-              <span className="ml-2 rounded bg-red-500/20 px-1.5 py-px text-[10px] font-semibold uppercase text-red-200/95">
-                LLM
-              </span>
+              <>
+                <span
+                  className="inline-flex cursor-help items-center rounded bg-red-500/25 px-1.5 py-px text-[10px] font-semibold uppercase text-red-100"
+                  title={
+                    [
+                      "El asistente automático no pudo generar bien la última respuesta.",
+                      data.last_agent_llm_error
+                        ? `Técnico: ${data.last_agent_llm_error.slice(0, 400)}${data.last_agent_llm_error.length > 400 ? "…" : ""}`
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")
+                  }
+                >
+                  IA con error
+                </span>
+                <Link
+                  href="/configuracion"
+                  className="shrink-0 font-medium text-[var(--wa-link)] underline underline-offset-2"
+                >
+                  Revisar Ajustes
+                </Link>
+              </>
             ) : null}
           </p>
         </div>
@@ -81,6 +109,8 @@ export default async function ChatDetailPage({ params }: Props) {
               ) : null}
             </span>
           ) : null}
+
+          <ResolveHandoffButton conversationId={data.id} hasPendingHandoff={Boolean(data.pending_handoff)} />
 
           {data.lead ? (
             <>
@@ -116,7 +146,8 @@ export default async function ChatDetailPage({ params }: Props) {
                 ) : (
                   "."
                 )}{" "}
-                Avisos automáticos (email, Slack) no están conectados todavía.
+                Cuando atiendas el caso, usa <strong className="text-[var(--wa-text)]">Marcar resuelto</strong> para
+                reabrir el chat al bot.
               </p>
             </details>
           ) : null}
@@ -177,20 +208,30 @@ export default async function ChatDetailPage({ params }: Props) {
               })
             )}
 
-            <div className="flex justify-end px-0.5 pt-1">
+            <div className="flex flex-col items-end gap-2 px-0.5 pt-1">
               {llmBad ? (
-                <details className="max-w-[min(88%,30rem)] rounded-xl border border-red-500/30 bg-red-950/40 text-left text-[11px] text-red-50/95">
-                  <summary className="cursor-pointer list-none px-2.5 py-1.5 marker:content-none [&::-webkit-details-marker]:hidden">
-                    <span className="font-semibold">Error LLM</span>
-                    <span className="ml-1 text-red-200/75">· tocar para detalle</span>
-                  </summary>
-                  <div className="border-t border-red-500/20 px-2.5 py-2 font-mono text-[10px] leading-snug text-red-100/85">
-                    {data.last_agent_llm_error ?? data.last_agent_llm_status}
-                  </div>
-                </details>
+                <div className="max-w-[min(88%,30rem)] rounded-xl border border-red-500/35 bg-red-950/45 px-3 py-2.5 text-left text-[12px] leading-snug text-red-50/95">
+                  <p className="font-semibold text-red-100">El asistente automático tuvo un problema</p>
+                  <p className="mt-1 text-[11px] text-red-100/85">
+                    Suele deberse a clave sin saldo, modelo incorrecto o límites de la API (OpenAI / Gemini). Puedes
+                    seguir atendiendo por WhatsApp como humano.
+                  </p>
+                  {data.last_agent_llm_error ? (
+                    <p className="mt-2 font-mono text-[10px] leading-snug text-red-200/80 [word-break:break-word]">
+                      {data.last_agent_llm_error.length > 600
+                        ? `${data.last_agent_llm_error.slice(0, 600)}…`
+                        : data.last_agent_llm_error}
+                    </p>
+                  ) : null}
+                  <p className="mt-2">
+                    <Link href="/configuracion" className="font-medium text-sky-300 underline underline-offset-2">
+                      Abrir Ajustes (Motor de IA)
+                    </Link>
+                  </p>
+                </div>
               ) : (
                 <p className="rounded-lg border border-emerald-500/15 bg-emerald-950/20 px-2 py-1 text-[10px] text-emerald-200/70">
-                  LLM última respuesta: <span className="font-mono text-emerald-100/90">ok</span>
+                  Última respuesta del modelo: <span className="font-mono text-emerald-100/90">ok</span>
                 </p>
               )}
             </div>

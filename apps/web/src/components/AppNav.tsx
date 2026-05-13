@@ -6,12 +6,14 @@ import { usePathname } from "next/navigation";
 const items = [
   { href: "/chats", label: "Chats", icon: "💬" },
   { href: "/leads", label: "Leads", icon: "📋" },
+  { href: "/estado", label: "Estado", icon: "📡" },
   { href: "/configuracion", label: "Ajustes", icon: "⚙" },
 ] as const;
 
 function isActive(pathname: string, href: string) {
   if (href === "/chats") return pathname === "/chats" || pathname.startsWith("/chats/");
   if (href === "/leads") return pathname === "/leads" || pathname.startsWith("/leads/");
+  if (href === "/estado") return pathname === "/estado" || pathname.startsWith("/estado/");
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

@@ -1,0 +1,1850 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "WhatsApp Agent API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/webhooks/twilio/whatsapp": {
+      "post": {
+        "summary": "Twilio Whatsapp",
+        "operationId": "twilio_whatsapp_webhooks_twilio_whatsapp_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/status": {
+      "get": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "Deployment Status",
+        "operationId": "deployment_status_internal_status_get",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/conversations": {
+      "get": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "List Conversations",
+        "operationId": "list_conversations_internal_conversations_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Tel\u00e9fono, canal o texto en lead (nombre/email/tel)",
+              "title": "Q"
+            },
+            "description": "Tel\u00e9fono, canal o texto en lead (nombre/email/tel)"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "open | handed_off | closed",
+              "title": "Status"
+            },
+            "description": "open | handed_off | closed"
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "updated_at >= (YYYY-MM-DD UTC)",
+              "title": "Date From"
+            },
+            "description": "updated_at >= (YYYY-MM-DD UTC)"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "updated_at < d\u00eda siguiente (YYYY-MM-DD UTC)",
+              "title": "Date To"
+            },
+            "description": "updated_at < d\u00eda siguiente (YYYY-MM-DD UTC)"
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConversationSummary"
+                  },
+                  "title": "Response List Conversations Internal Conversations Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/leads": {
+      "get": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "List Leads",
+        "operationId": "list_leads_internal_leads_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "stage",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Stage"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LeadListItem"
+                  },
+                  "title": "Response List Leads Internal Leads Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/conversations/{conversation_id}": {
+      "get": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "Get Conversation",
+        "operationId": "get_conversation_internal_conversations__conversation_id__get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/conversations/{conversation_id}/panel": {
+      "patch": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "Patch Conversation Panel",
+        "operationId": "patch_conversation_panel_internal_conversations__conversation_id__panel_patch",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationPanelPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationPanelOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/conversations/{conversation_id}/handoff": {
+      "post": {
+        "tags": [
+          "internal"
+        ],
+        "summary": "Create Handoff",
+        "operationId": "create_handoff_internal_conversations__conversation_id__handoff_post",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandoffCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/settings": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Get Workspace Settings",
+        "operationId": "get_workspace_settings_internal_settings_get",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsPublic"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Put Workspace Settings",
+        "operationId": "put_workspace_settings_internal_settings_put",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsPublic"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/settings/agent-catalog/parse": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Parse Agent Catalog Upload",
+        "description": "Convierte CSV o Excel (.xlsx) en l\u00edneas \u00abcelda | celda | \u2026\u00bb para pegar en el cat\u00e1logo del agente.",
+        "operationId": "parse_agent_catalog_upload_internal_settings_agent_catalog_parse_post",
+        "parameters": [
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_parse_agent_catalog_upload_internal_settings_agent_catalog_parse_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogParseOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "summary": "Health Ready",
+        "description": "Comprueba conexi\u00f3n a Postgres (\u00fatil en orquestadores / balanceadores).",
+        "operationId": "health_ready_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "summary": "Prometheus Metrics",
+        "description": "Prometheus scrape (restringir en red en producci\u00f3n).",
+        "operationId": "prometheus_metrics_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_parse_agent_catalog_upload_internal_settings_agent_catalog_parse_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_parse_agent_catalog_upload_internal_settings_agent_catalog_parse_post"
+      },
+      "CatalogParseOut": {
+        "properties": {
+          "catalog_fragment": {
+            "type": "string",
+            "title": "Catalog Fragment"
+          },
+          "rows_imported": {
+            "type": "integer",
+            "title": "Rows Imported"
+          },
+          "file_type": {
+            "type": "string",
+            "title": "File Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "catalog_fragment",
+          "rows_imported",
+          "file_type"
+        ],
+        "title": "CatalogParseOut"
+      },
+      "ConversationDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "twilio_from": {
+            "type": "string",
+            "title": "Twilio From"
+          },
+          "twilio_to": {
+            "type": "string",
+            "title": "Twilio To"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/MessageOut"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "lead": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LeadOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "internal_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Internal Notes"
+          },
+          "internal_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Internal Tags"
+          },
+          "last_agent_llm_status": {
+            "type": "string",
+            "title": "Last Agent Llm Status",
+            "default": "ok"
+          },
+          "last_agent_llm_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Agent Llm Error"
+          },
+          "pending_handoff": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HandoffBrief"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "twilio_from",
+          "twilio_to",
+          "status",
+          "updated_at",
+          "messages",
+          "lead"
+        ],
+        "title": "ConversationDetail"
+      },
+      "ConversationPanelOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "internal_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Internal Notes"
+          },
+          "internal_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Internal Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "internal_notes",
+          "internal_tags"
+        ],
+        "title": "ConversationPanelOut"
+      },
+      "ConversationPanelPatch": {
+        "properties": {
+          "internal_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Internal Notes"
+          },
+          "internal_tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Internal Tags"
+          }
+        },
+        "type": "object",
+        "title": "ConversationPanelPatch"
+      },
+      "ConversationSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "twilio_from": {
+            "type": "string",
+            "title": "Twilio From"
+          },
+          "twilio_to": {
+            "type": "string",
+            "title": "Twilio To"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "message_count": {
+            "type": "integer",
+            "title": "Message Count"
+          },
+          "last_agent_llm_status": {
+            "type": "string",
+            "title": "Last Agent Llm Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "twilio_from",
+          "twilio_to",
+          "status",
+          "updated_at",
+          "message_count",
+          "last_agent_llm_status"
+        ],
+        "title": "ConversationSummary"
+      },
+      "DeploymentStatus": {
+        "properties": {
+          "api_version": {
+            "type": "string",
+            "title": "Api Version"
+          },
+          "git_commit": {
+            "type": "string",
+            "title": "Git Commit"
+          },
+          "database": {
+            "type": "string",
+            "title": "Database"
+          },
+          "redis_configured": {
+            "type": "boolean",
+            "title": "Redis Configured",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "api_version",
+          "git_commit",
+          "database"
+        ],
+        "title": "DeploymentStatus"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HandoffBrief": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "reason",
+          "status",
+          "created_at"
+        ],
+        "title": "HandoffBrief"
+      },
+      "HandoffCreate": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": "manual_from_dashboard"
+          }
+        },
+        "type": "object",
+        "title": "HandoffCreate"
+      },
+      "HandoffOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Conversation Id"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "conversation_id",
+          "reason",
+          "status",
+          "created_at"
+        ],
+        "title": "HandoffOut"
+      },
+      "LeadListItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Conversation Id"
+          },
+          "twilio_from": {
+            "type": "string",
+            "title": "Twilio From"
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "qualification": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualification"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "conversation_id",
+          "twilio_from",
+          "phone",
+          "email",
+          "name",
+          "stage",
+          "qualification",
+          "updated_at"
+        ],
+        "title": "LeadListItem"
+      },
+      "LeadOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "phone": {
+            "type": "string",
+            "title": "Phone"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "qualification": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualification"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "phone",
+          "email",
+          "name",
+          "stage",
+          "qualification"
+        ],
+        "title": "LeadOut"
+      },
+      "MessageOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "direction": {
+            "type": "string",
+            "title": "Direction"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "twilio_message_sid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Twilio Message Sid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "direction",
+          "body",
+          "twilio_message_sid",
+          "created_at"
+        ],
+        "title": "MessageOut"
+      },
+      "SettingsPublic": {
+        "properties": {
+          "twilio_account_sid": {
+            "type": "string",
+            "title": "Twilio Account Sid"
+          },
+          "webhook_base_url": {
+            "type": "string",
+            "title": "Webhook Base Url"
+          },
+          "twilio_validate_signature": {
+            "type": "boolean",
+            "title": "Twilio Validate Signature"
+          },
+          "llm_provider": {
+            "type": "string",
+            "title": "Llm Provider"
+          },
+          "openai_model": {
+            "type": "string",
+            "title": "Openai Model"
+          },
+          "gemini_model": {
+            "type": "string",
+            "title": "Gemini Model"
+          },
+          "twilio_auth_token_configured": {
+            "type": "boolean",
+            "title": "Twilio Auth Token Configured"
+          },
+          "openai_api_key_configured": {
+            "type": "boolean",
+            "title": "Openai Api Key Configured"
+          },
+          "gemini_api_key_configured": {
+            "type": "boolean",
+            "title": "Gemini Api Key Configured"
+          },
+          "twilio_webhook_full_url": {
+            "type": "string",
+            "title": "Twilio Webhook Full Url"
+          },
+          "agent_business_summary": {
+            "type": "string",
+            "title": "Agent Business Summary"
+          },
+          "agent_instructions": {
+            "type": "string",
+            "title": "Agent Instructions"
+          },
+          "agent_lead_capture": {
+            "type": "string",
+            "title": "Agent Lead Capture"
+          },
+          "agent_catalog": {
+            "type": "string",
+            "title": "Agent Catalog"
+          },
+          "agent_pricing_rules": {
+            "type": "string",
+            "title": "Agent Pricing Rules"
+          },
+          "agent_shipping_zones": {
+            "type": "string",
+            "title": "Agent Shipping Zones"
+          },
+          "agent_payment_methods": {
+            "type": "string",
+            "title": "Agent Payment Methods"
+          },
+          "agent_returns_warranty": {
+            "type": "string",
+            "title": "Agent Returns Warranty"
+          },
+          "agent_faq": {
+            "type": "string",
+            "title": "Agent Faq"
+          },
+          "agent_off_hours_message": {
+            "type": "string",
+            "title": "Agent Off Hours Message"
+          },
+          "agent_hard_rules": {
+            "type": "string",
+            "title": "Agent Hard Rules"
+          }
+        },
+        "type": "object",
+        "required": [
+          "twilio_account_sid",
+          "webhook_base_url",
+          "twilio_validate_signature",
+          "llm_provider",
+          "openai_model",
+          "gemini_model",
+          "twilio_auth_token_configured",
+          "openai_api_key_configured",
+          "gemini_api_key_configured",
+          "twilio_webhook_full_url",
+          "agent_business_summary",
+          "agent_instructions",
+          "agent_lead_capture",
+          "agent_catalog",
+          "agent_pricing_rules",
+          "agent_shipping_zones",
+          "agent_payment_methods",
+          "agent_returns_warranty",
+          "agent_faq",
+          "agent_off_hours_message",
+          "agent_hard_rules"
+        ],
+        "title": "SettingsPublic"
+      },
+      "SettingsUpdate": {
+        "properties": {
+          "twilio_account_sid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Twilio Account Sid"
+          },
+          "twilio_auth_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Twilio Auth Token"
+          },
+          "webhook_base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Webhook Base Url"
+          },
+          "twilio_validate_signature": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Twilio Validate Signature"
+          },
+          "llm_provider": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "openai",
+                  "gemini"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Provider"
+          },
+          "openai_api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Openai Api Key"
+          },
+          "openai_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Openai Model"
+          },
+          "gemini_api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gemini Api Key"
+          },
+          "gemini_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gemini Model"
+          },
+          "agent_business_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Business Summary"
+          },
+          "agent_instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Instructions"
+          },
+          "agent_lead_capture": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Lead Capture"
+          },
+          "agent_catalog": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Catalog"
+          },
+          "agent_pricing_rules": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Pricing Rules"
+          },
+          "agent_shipping_zones": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Shipping Zones"
+          },
+          "agent_payment_methods": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Payment Methods"
+          },
+          "agent_returns_warranty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Returns Warranty"
+          },
+          "agent_faq": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Faq"
+          },
+          "agent_off_hours_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Off Hours Message"
+          },
+          "agent_hard_rules": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Hard Rules"
+          }
+        },
+        "type": "object",
+        "title": "SettingsUpdate",
+        "description": "Solo se actualizan campos enviados. Cadena vac\u00eda en secretos borra el valor guardado en BD (vuelve al .env)."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

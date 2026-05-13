@@ -4,9 +4,11 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { formatRelativeActivity } from "@/lib/relative-time";
 import { waAvatarGlyph, waAvatarHue, waChatTitle } from "@/lib/wa-display";
 
 const FILTER_KEYS = ["q", "status", "date_from", "date_to"] as const;
+const POLL_MS = 18_000;
 
 export type ChatSidebarRow = {
   id: string;
@@ -15,6 +17,8 @@ export type ChatSidebarRow = {
   updated_at: string;
   message_count: number;
   last_agent_llm_status: string;
+  has_pending_handoff?: boolean;
+  last_agent_llm_error_snippet?: string | null;
 };
 
 function activeConversationId(pathname: string): string | null {
@@ -30,6 +34,18 @@ function filterQueryString(sp: URLSearchParams): string {
   }
   const s = n.toString();
   return s ? `?${s}` : "";
+}
+
+async function fetchConversationRows(fq: string): Promise<ChatSidebarRow[]> {
+  const qs = new URLSearchParams(fq ? fq.slice(1) : "");
+  qs.set("limit", "100");
+  const res = await fetch(`/api/internal/conversations?${qs}`, { cache: "no-store" });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(t || `HTTP ${res.status}`);
+  }
+  const data = (await res.json()) as ChatSidebarRow[];
+  return Array.isArray(data) ? data : [];
 }
 
 export function ChatShell({
@@ -72,15 +88,8 @@ export function ChatShell({
       setLoading(true);
       setFetchErr(null);
       try {
-        const qs = new URLSearchParams(fq.slice(1));
-        qs.set("limit", "100");
-        const res = await fetch(`/api/internal/conversations?${qs}`, { cache: "no-store" });
-        if (!res.ok) {
-          const t = await res.text();
-          throw new Error(t || `HTTP ${res.status}`);
-        }
-        const data = (await res.json()) as ChatSidebarRow[];
-        if (!cancelled) setRows(Array.isArray(data) ? data : []);
+        const data = await fetchConversationRows(fq);
+        if (!cancelled) setRows(data);
       } catch (e) {
         if (!cancelled) setFetchErr(e instanceof Error ? e.message : "Error al filtrar");
       } finally {
@@ -91,6 +100,29 @@ export function ChatShell({
       cancelled = true;
     };
   }, [fq, initialRows]);
+
+  const silentPoll = useCallback(async () => {
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+    try {
+      const data = await fetchConversationRows(fq);
+      setRows(data);
+      if (fq) setFetchErr(null);
+    } catch {
+      /* no molestar en polling silencioso */
+    }
+  }, [fq]);
+
+  useEffect(() => {
+    const id = setInterval(() => void silentPoll(), POLL_MS);
+    const onVis = () => {
+      if (document.visibilityState === "visible") void silentPoll();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [silentPoll]);
 
   const applyFilters = useCallback(() => {
     const n = new URLSearchParams();
@@ -120,7 +152,7 @@ export function ChatShell({
             Conversaciones
           </h2>
           <p className="mt-0.5 text-[11px] font-medium text-[var(--wa-text-muted)]">
-            {loading ? "Cargando…" : `${rows.length} chat${rows.length === 1 ? "" : "s"}`} · Twilio
+            {loading ? "Cargando…" : `${rows.length} chat${rows.length === 1 ? "" : "s"}`} · actualización automática
           </p>
           <div className="mt-3 space-y-2 rounded-xl border border-white/[0.06] bg-black/25 p-2.5">
             <input
@@ -174,19 +206,41 @@ export function ChatShell({
             </div>
           </div>
           {fetchErr ? (
-            <p className="mt-2 text-[10px] leading-snug text-[var(--wa-danger)]">{fetchErr}</p>
+            <p className="mt-2 text-[10px] leading-snug text-[var(--wa-danger)]" role="alert">
+              {fetchErr}
+            </p>
           ) : null}
         </div>
-        <nav className="wa-scroll flex-1 overflow-y-auto">
+        <nav className="wa-scroll flex-1 overflow-y-auto" aria-busy={loading} aria-live="polite">
           {rows.length === 0 ? (
-            <div className="px-4 py-10 text-center text-xs leading-relaxed text-[var(--wa-text-muted)]">
-              {fq ? "Ningún chat coincide con el filtro." : "Aún no hay mensajes."}
-              {!fq ? (
+            <div className="px-4 py-8 text-center text-xs leading-relaxed text-[var(--wa-text-muted)]">
+              {fq ? (
+                <p>Ningún chat coincide con el filtro.</p>
+              ) : (
                 <>
-                  <br />
-                  <span className="mt-2 inline-block text-[var(--wa-accent-soft)]">Sandbox → webhook</span>
+                  <p className="font-medium text-[var(--wa-text)]">Aún no hay conversaciones</p>
+                  <p className="mt-2">
+                    Cuando Twilio reciba un mensaje de WhatsApp y el webhook apunte a tu API, aparecerán aquí.
+                  </p>
+                  <ol className="mt-3 list-decimal space-y-2 pl-5 text-left text-[11px]">
+                    <li>
+                      Revisa{" "}
+                      <Link href="/configuracion" className="font-medium text-[var(--wa-link)] underline">
+                        Ajustes
+                      </Link>{" "}
+                      (Twilio + URL del túnel).
+                    </li>
+                    <li>
+                      Comprueba{" "}
+                      <Link href="/estado" className="font-medium text-[var(--wa-link)] underline">
+                        Estado
+                      </Link>{" "}
+                      si la API responde.
+                    </li>
+                    <li>Envía un mensaje al sandbox de WhatsApp y espera unos segundos.</li>
+                  </ol>
                 </>
-              ) : null}
+              )}
             </div>
           ) : (
             <ul className="py-1">
@@ -200,8 +254,18 @@ export function ChatShell({
                   when.toDateString() === new Date().toDateString()
                     ? when.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
                     : when.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+                const rel = formatRelativeActivity(r.updated_at);
                 const llmBad = (r.last_agent_llm_status || "ok").toLowerCase() !== "ok";
-                const llmLabel = llmBad ? "ERR" : "OK";
+                const llmTitle = llmBad
+                  ? [
+                      "El asistente automático falló en la última respuesta.",
+                      r.last_agent_llm_error_snippet ? `Detalle: ${r.last_agent_llm_error_snippet}` : "",
+                      "Revisa Motor de IA en Ajustes (clave, modelo, cuotas).",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")
+                  : "Última respuesta del modelo: correcta.";
+                const pending = Boolean(r.has_pending_handoff);
 
                 return (
                   <li key={r.id}>
@@ -216,13 +280,21 @@ export function ChatShell({
                       ].join(" ")}
                     >
                       <div
-                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-sm font-bold text-white shadow-lg ring-1 ring-white/10 transition group-hover:ring-[var(--wa-accent)]/40"
+                        className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-sm font-bold text-white shadow-lg ring-1 ring-white/10 transition group-hover:ring-[var(--wa-accent)]/40"
                         style={{
                           background: `linear-gradient(145deg, hsl(${hue},58%,44%), hsl(${(hue + 42) % 360},52%,30%))`,
                         }}
                         aria-hidden
                       >
                         {glyph}
+                        {pending ? (
+                          <span
+                            className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-amber-500 px-0.5 text-[9px] font-bold text-[#0b141a] ring-2 ring-[#111b21]"
+                            title="Escalado pendiente"
+                          >
+                            !
+                          </span>
+                        ) : null}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-baseline justify-between gap-2">
@@ -231,31 +303,46 @@ export function ChatShell({
                           >
                             {title}
                           </span>
-                          <time className="shrink-0 text-[10px] font-medium tabular-nums text-[var(--wa-text-muted)]">
-                            {timeStr}
-                          </time>
+                          <div className="flex shrink-0 flex-col items-end gap-0.5">
+                            <time
+                              className="text-[10px] font-medium tabular-nums text-[var(--wa-text-muted)]"
+                              dateTime={r.updated_at}
+                            >
+                              {timeStr}
+                            </time>
+                            {rel ? (
+                              <span className="text-[9px] font-medium text-[var(--wa-text-muted)]/90" title="Actividad">
+                                {rel}
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
-                        <p className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] text-[var(--wa-text-muted)]">
+                        <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[12px] text-[var(--wa-text-muted)]">
                           <span
                             className={
                               r.status === "open"
-                                ? "mr-0.5 inline-block rounded-full bg-[var(--wa-accent)]/25 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-[var(--wa-accent-soft)]"
-                                : "mr-0.5 text-[10px] uppercase text-[var(--wa-text-muted)]"
+                                ? "inline-block rounded-full bg-[var(--wa-accent)]/25 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-[var(--wa-accent-soft)]"
+                                : "text-[10px] uppercase text-[var(--wa-text-muted)]"
                             }
                           >
                             {r.status}
                           </span>
+                          {pending ? (
+                            <span className="rounded bg-amber-500/25 px-1.5 py-px text-[9px] font-bold uppercase text-amber-100">
+                              Esc
+                            </span>
+                          ) : null}
                           <span
                             className="inline-flex shrink-0 items-center gap-0.5 rounded px-1 py-px text-[9px] font-bold uppercase tracking-wide"
                             style={{
                               color: llmBad ? "#fecaca" : "#6ee7b7",
                               background: llmBad ? "rgba(127,29,29,0.35)" : "rgba(6,78,59,0.35)",
                             }}
-                            title={llmBad ? "Última respuesta del agente: error de LLM" : "LLM: ok"}
+                            title={llmTitle}
                           >
-                            {llmLabel}
+                            {llmBad ? "IA" : "OK"}
                           </span>
-                          <span className="truncate">{r.message_count} mensajes</span>
+                          <span className="truncate">{r.message_count} msg</span>
                         </p>
                       </div>
                     </Link>

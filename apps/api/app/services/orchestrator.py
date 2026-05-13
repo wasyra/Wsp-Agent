@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import html
+import logging
 from typing import Any
 
+from openai import RateLimitError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agent.gemini_agent import _looks_like_quota_error, gemini_quota_user_message
 from app.agent.tool_handlers import generate_assistant_reply
 from app.models import MessageDirection
 from app.services.conversation import (
@@ -13,6 +16,8 @@ from app.services.conversation import (
     get_inbound_by_twilio_sid,
     get_or_create_conversation,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def twiml_message(text: str) -> str:
@@ -67,11 +72,24 @@ async def process_inbound_whatsapp(session: AsyncSession, form: dict[str, Any]) 
         reply = await generate_assistant_reply(session, conversation=conv, user_text=body)
         conv.last_agent_llm_status = "ok"
         conv.last_agent_llm_error = None
-    except Exception as exc:  # noqa: BLE001
+    except RateLimitError as exc:
+        logger.warning("OpenAI rate limit conversation_id=%s: %s", conv.id, exc)
         reply = (
-            "Disculpa, tuvimos un problema técnico al generar la respuesta. "
-            "Un asesor humano revisará tu mensaje y te contactará pronto."
+            "El servicio de IA está temporalmente saturado. Intenta de nuevo en unos minutos; "
+            "un asesor también puede ayudarte."
         )
+        conv.last_agent_llm_status = "error"
+        conv.last_agent_llm_error = str(exc)[:900]
+    except Exception as exc:  # noqa: BLE001
+        if _looks_like_quota_error(exc):
+            logger.warning("LLM quota conversation_id=%s: %s", conv.id, exc)
+            reply = gemini_quota_user_message(exc)
+        else:
+            logger.exception("generate_assistant_reply failed conversation_id=%s", conv.id)
+            reply = (
+                "Disculpa, tuvimos un problema técnico al generar la respuesta. "
+                "Un asesor humano revisará tu mensaje y te contactará pronto."
+            )
         conv.last_agent_llm_status = "error"
         conv.last_agent_llm_error = str(exc)[:900]
     await add_message(

@@ -2,11 +2,15 @@
   "name": "wsp-agent-monorepo",
   "private": true,
   "scripts": {
+    "screenshots:readme": "node scripts/capture-readme-screens.mjs",
     "lint:api": "cd apps/api && python -m ruff check .",
     "test:api": "cd apps/api && python -m pytest -q",
     "lint:web": "npm run lint --prefix apps/web",
     "build:web": "npm run build --prefix apps/web",
     "gen:api-types": "npm run gen:api-types --prefix apps/web",
     "export:openapi": "cd apps/api && python scripts/export_openapi.py"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.1"
   }
 }

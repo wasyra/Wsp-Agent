@@ -81,7 +81,9 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Abre `http://localhost:3000`. Verás el panel vacío. Ve a **Configuración** y pega tu clave Gemini u OpenAI; el catálogo y las reglas las puedes pegar como texto plano o subir un CSV/Excel.
+Abre **`http://localhost:3001`** (Compose publica el contenedor en el host en el puerto **3001** por defecto para no chocar con otro proceso en **3000** — típico si tienes `next dev` u otra app). Si necesitas otro puerto, define `WEB_PUBLISH_PORT` en `.env` y alinea `CORS_ORIGINS` (mismo origen que uses en el navegador). Con `npm run dev` en `apps/web`, el panel sigue siendo habitualmente `http://localhost:3000`.
+
+Verás el panel vacío. Ve a **Configuración** y pega tu clave Gemini u OpenAI; el catálogo y las reglas las puedes pegar como texto plano o subir un CSV/Excel.
 
 Para simular una conversación sin Twilio, inserta filas directamente en Supabase (`conversations`, `messages`) o llama al endpoint interno (ver [API interna](#api-interna-panel-next)).
 
@@ -93,11 +95,11 @@ Para simular una conversación sin Twilio, inserta filas directamente en Supabas
    ```bash
    ngrok http 8000
    ```
-4. En el panel `http://localhost:3000/configuracion`:
+4. En el panel `http://localhost:3001/configuracion`:
    - Pega tu **Account SID** y **Auth Token** de Twilio.
    - Pega la URL pública del túnel en **WEBHOOK_BASE_URL** (ej. `https://abc123.ngrok.app`).
    - Copia la URL completa del webhook (la genera el panel) y pégala en Twilio → Sandbox → *When a message comes in*.
-5. Únete al sandbox desde tu WhatsApp con el código de Twilio y mándale un mensaje. Se verá en `http://localhost:3000/chats`.
+5. Únete al sandbox desde tu WhatsApp con el código de Twilio y mándale un mensaje. Se verá en `http://localhost:3001/chats`.
 
 > La firma HMAC sale por defecto en **false** para arranque rápido. Para producción ponla en `true` y asegúrate que `WEBHOOK_BASE_URL` coincida exactamente con la URL que Twilio llama (esquema, host y path).
 
@@ -114,6 +116,38 @@ Para simular una conversación sin Twilio, inserta filas directamente en Supabas
 | `/leads` | Leads capturados con sus campos estructurados y `qualification` JSONB. Exportable. |
 | `/configuracion` | Secretos Twilio/LLM, selector de proveedor (OpenAI / Gemini), modelo, catálogo (CSV/Excel → líneas), reglas, FAQ, tono. |
 | `/estado` | Versión de API, `GIT_COMMIT` del despliegue, salud de DB, status de Redis. |
+
+### Capturas del panel (Docker)
+
+Generadas con Playwright contra el stack local (mismo origen que arriba, puerto **3001**). Para volver a generarlas: `npm install` en la raíz del repo, `npx playwright install chromium`, con `docker compose up` levantado ejecuta `npm run screenshots:readme` (variable opcional `PANEL_URL` si publicas en otro host/puerto).
+
+#### Inicio — `/`
+
+![Inicio](./docs/readme-screenshots/01-inicio.png)
+
+#### Chats — `/chats`
+
+![Chats](./docs/readme-screenshots/02-chats.png)
+
+#### Conversaciones — `/conversations`
+
+![Conversaciones](./docs/readme-screenshots/03-conversaciones.png)
+
+#### Leads — `/leads`
+
+![Leads](./docs/readme-screenshots/04-leads.png)
+
+#### Configuración — pestaña «Configuración general»
+
+![Configuración general](./docs/readme-screenshots/05-configuracion-general.png)
+
+#### Configuración — pestaña «Agente de WhatsApp»
+
+![Agente de WhatsApp](./docs/readme-screenshots/06-configuracion-agente.png)
+
+#### Estado — `/estado`
+
+![Estado](./docs/readme-screenshots/07-estado.png)
 
 ## Lo que hace el agente (tools)
 
@@ -238,7 +272,8 @@ Cierre del audit completo en [`PLAN_WHATSAPP_AGENT.md`](./PLAN_WHATSAPP_AGENT.md
 | API | `LOG_JSON` | `false` | `true` para agregadores. |
 | API | `LOG_LEVEL` | `INFO` | |
 | API | `GIT_COMMIT` | `local` | Inyectado por CI/CD para mostrar en `/estado`. |
-| API | `CORS_ORIGINS` | `http://localhost:3000` | Lista separada por coma. |
+| Root / Compose | `WEB_PUBLISH_PORT` | `3001` | Puerto del **host** donde se publica el servicio `web` (`host:3001` → contenedor `3000`). |
+| API | `CORS_ORIGINS` | `http://localhost:3001` | Orígenes permitidos del navegador (lista separada por coma). Con Compose por defecto debe coincidir con el puerto publicado del panel. |
 | Web | `BACKEND_URL` | `http://api:8000` | Server-side fetch. |
 | Web | `INTERNAL_API_KEY` | igual que API | Para que `/api/internal/*` reenvíe. |
 

@@ -22,7 +22,8 @@ services:
       WEBHOOK_BASE_URL: ${WEBHOOK_BASE_URL:-http://localhost:8000}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      # Debe coincidir con el origen del navegador (puerto publicado del servicio web).
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       LOG_JSON: ${LOG_JSON:-false}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -40,7 +41,8 @@ services:
       BACKEND_URL: http://api:8000
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
     ports:
-      - "3000:3000"
+      # Host 3001 por defecto para evitar choque con otro proceso en 3000 (p. ej. Next dev / Cursor).
+      - "${WEB_PUBLISH_PORT:-3001}:3000"
     depends_on:
       - api
 
